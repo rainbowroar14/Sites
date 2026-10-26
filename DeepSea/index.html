@@ -140,7 +140,7 @@ function updFish(dt,T){fish.t+=dt;
     fish.hvx=(fish.hvx||0)+kx*24*dt;fish.hvx*=Math.exp(-1.6*dt);fish.hvx=Math.max(-18,Math.min(18,fish.hvx));
     const fl=floorY(fish.x)-4;if(fish.y<fl){fish.y=Math.min(fl,fish.y+26*sm*dt);fish.x+=Math.sin(T*0.7)*3*dt;}
     fish.x+=fish.hvx*dt;if(fish.x<WALLX+4){fish.x=WALLX+4;fish.hvx=0;}if(fish.y>floorY(fish.x)-4)fish.y=floorY(fish.x)-4;}
-  else if(fish.st===4){fish.hvx=0;const dx=rodTip[0]-fish.x,dy=rodTip[1]-fish.y,d=Math.hypot(dx,dy);if(d<4){fish.st=0;if(fish.caught){deck.push(newDeck(fish.caught.k||'sard'));fish.caught=null;}}else{const v=Math.min(d,(60+d*0.6)*dt);fish.x+=dx/d*v;fish.y+=dy/d*v;}}}
+  else if(fish.st===4){fish.hvx=0;const dx=rodTip[0]-fish.x,dy=rodTip[1]-fish.y,d=Math.hypot(dx,dy);if(d<4){fish.st=0;if(fish.caught){deck.push(newDeck(fish.caught.k||'sard'));saveDeck();fish.caught=null;}}else{const v=Math.min(d,(60+d*0.6)*dt);fish.x+=dx/d*v;fish.y+=dy/d*v;}}}
 // ---- sardine schools (boids), seeded per 500px chunk, spawned near the camera
 const SARD={"pal": ["#a89a4a", "#1c2a24", "#4e6a52", "#93a88a", "#dfe4c8"], "frames": [["......00...", "...11222110", ".1123232100", "13333333300", ".144444441.", "...10....0."], ["......00.10", "...11222100", ".1123232100", "1333333331.", ".144444440.", "...1......."], ["......00...", "...11222110", ".1123232100", "13333333300", ".144444441.", "...1...0.0."], ["......00...", "...112221..", ".1123232110", "13333333300", ".1444444400", "...10..0.1."]]};const SARDC=SARD.pal.map(h=>{const n=parseInt(h.slice(1),16);return [n>>16,(n>>8)&255,n&255];});
 const schools=new Map();
@@ -426,7 +426,7 @@ function drawRope(T){if(!ROPE.length)return;const n=Math.min(RN-1,Math.ceil(Math
     if(f.k==='jelly'){drawJellyCargo((p[0]+q[0])/2,(p[1]+q[1])/2,(fl?a:a-Math.PI)+flop,T,f);return;}
     drawRot(S.frames[((Math.floor(T*(T-(f.fl||-9)<0.4?12:3)+i)%4)+4)%4],PC,(p[0]+q[0])/2-cx,(p[1]+q[1])/2-cy,fl,(fl?a:a-Math.PI)+flop,T);});}
 function exitBoat(){Object.assign(DV,{on:true,x:B.x-B.face*18,y:B.y-6,vx:-B.face*18,vy:-45,hop:1.2,spl:0,cur:'idle',tgt:'idle',q:[],fi:0,ft:0});SPR.st=0;SPR.fish=[];DV.face=-B.face;ROPE.length=0;}
-function tryEnter(){if(!DV.near)return false;DV.sub=false;for(const f of DV.carry.concat(SPR.fish)){if(f.k==='cage'){CC.stock++;for(let i=0;i<f.lvl;i++)deck.push(newDeck('mcrab'));cageMsg('+'+f.lvl+' MUD CRAB'+(f.lvl>1?'S':'')+' TO DECK, CAGE BACK',T,2);}else deck.push(newDeck(f.k));}DV.carry=[];SPR.fish=[];SPR.st=0;DV.on=false;splash(DV.x,surfY(DV.x,T),10,0.5);return true;}
+function tryEnter(){if(!DV.near)return false;DV.sub=false;for(const f of DV.carry.concat(SPR.fish)){if(f.k==='cage'){CC.stock++;for(let i=0;i<f.lvl;i++)deck.push(newDeck('mcrab'));cageMsg('+'+f.lvl+' MUD CRAB'+(f.lvl>1?'S':'')+' TO DECK, CAGE BACK',T,2);}else deck.push(newDeck(f.k));}saveDeck();DV.carry=[];SPR.fish=[];SPR.st=0;DV.on=false;splash(DV.x,surfY(DV.x,T),10,0.5);return true;}
 function fireSpear(){if(SPR.st||DV.hop>0||DV.sub)return;if(carryW()>=CAP){DV.fullT=T+1.5;return;}const m=muzzle(),a=Math.atan2(mouse.y+cy-m[1],mouse.x+cx-m[0]);
   Object.assign(SPR,{hit:new Set(),auto:false,st:1,x:m[0],y:m[1],vx:Math.cos(a)*300,vy:Math.sin(a)*300,ang:a,age:0,rel:false});for(let i=0;i<5;i++)spawn(m[0],m[1],(Math.random()-0.5)*10,-5,0.8,2);}
 function skewer(T){const tx=SPR.x,ty=SPR.y;const kingLoad=hasKing()||SPR.fish.some(f=>f.k==='king');
@@ -512,9 +512,12 @@ F["+"]="000010111010000";F["/"]="001001010100100";
 // ---- feeding the squid
 const PTS={sard:10,tuna:50,mako:250,crab:25,gcrab:150,mcrab:50,jelly:15,king:1000},THX={sard:"MMM, SARDINE! SALTY LITTLE SNACK. THANKS!",tuna:"A WHOLE TUNA?! YOU SPOIL ME. THANK YOU!",mako:"A SHARK?! CRUNCHY. YOU ARE MY HERO.",crab:"A HERMIT CRAB! CRUNCHY SHELL SNACK.",gcrab:"A GIANT CRAB?! MOSSY AND DELICIOUS!",mcrab:"A MUD CRAB FROM YOUR CAGE! SO FRESH.",jelly:"A GLOWING JELLY! IT TINGLES. I LOVE IT.",king:"THE KING JELLY?! YOU ARE A LEGEND. FEAST!"};
 const FEED={f:null,fl:[],thank:null,pops:[],eaten:0,yumT:-9,yum:''};let score=0,best=0;const STORE={get(k){try{return window.localStorage.getItem(k);}catch(e){return STORE.m[k]??null;}},set(k,v){STORE.m[k]=String(v);try{window.localStorage.setItem(k,v);}catch(e){}},m:{}};try{best=+(STORE.get('deepsea_best')||0)||0;}catch(e){best=0;}
+const DECK_OK={sard:1,tuna:1,mako:1,crab:1,gcrab:1,mcrab:1,jelly:1,king:1};
+function saveDeck(){try{STORE.set('deepsea_deck',deck.map(f=>f.k).filter(k=>DECK_OK[k]).join(','));}catch(e){}}
+function loadDeck(){try{const raw=STORE.get('deepsea_deck');if(!raw)return;for(const k of String(raw).split(','))if(DECK_OK[k])deck.push(newDeck(k));}catch(e){}}
 function playDrop(rate,vol){if(!actx||!blipBuf)return;const s=actx.createBufferSource(),g=actx.createGain();s.buffer=blipBuf;s.playbackRate.value=rate;g.gain.value=vol;s.connect(g);g.connect(actx.destination);s.start();}
 function feedMouth(T){return [SQX-4,surfY(SQX,T)-12];}
-function feedKey(){if(DV.on||talk.on||!nearSquid||!deck.length)return;const d=deck.pop(),x=B.x-B.face*10,y=B.y-8,[tx,ty]=feedMouth(T),t=0.9+Math.min(0.6,Math.abs(tx-x)/250),g=160;
+function feedKey(){if(DV.on||talk.on||!nearSquid||!deck.length)return;const d=deck.pop();saveDeck();const x=B.x-B.face*10,y=B.y-8,[tx,ty]=feedMouth(T),t=0.9+Math.min(0.6,Math.abs(tx-x)/250),g=160;
   FEED.fl.push({k:d.k,x,y,vx:(tx-x)/t,vy:(ty-y)/t-0.5*g*t,a:0,va:(Math.random()<0.5?-1:1)*(8+Math.random()*5),t:0,dur:t});FEED.f=FEED.fl[0];pupil.hold=0;playDrop(1.5,0.5);}
 function updFeed(dt,T){for(const f of FEED.fl.slice()){f.t+=dt;f.vy+=160*dt;f.x+=f.vx*dt;f.y+=f.vy*dt;f.a+=f.va*dt;pupil.hold=0;
     const [mx,my]=feedMouth(T);if(f.t>=f.dur||Math.hypot(f.x-mx,f.y-my)<4){const p=PTS[f.k];score+=p;FEED.eaten++;if(score>best){best=score;STORE.set('deepsea_best',best);}
@@ -554,7 +557,7 @@ function drawBoatMarker(T){if(!DV.on)return;let bx=B.x-cx,by=B.y-cy-14;const on=
   if(on){my-=4;}const ca=Math.cos(ang),sa=Math.sin(ang),inA=(x,y)=>{const u=x*ca+y*sa,v=-x*sa+y*ca;return (u>=0&&u<=6&&Math.abs(v)<=(6-u)*0.62+0.3)||(u>=-5&&u<0&&Math.abs(v)<=1.1);};
   for(let y=-8;y<=8;y++)for(let x=-8;x<=8;x++){if(inA(x,y))px(mx+x,my+y,RED);else if(inA(x+1,y)||inA(x-1,y)||inA(x,y+1)||inA(x,y-1))px(mx+x,my+y,DK);}
   if(!on){const s=Math.round(Math.hypot(B.x-DV.x,B.y-DV.y)/10)+"M",tx=Math.max(2,Math.min(W-s.length*4-2,mx-s.length*2)),ty=my+(my>H/2?-12:7);for(let y=ty-1;y<ty+6;y++)for(let x=tx-1;x<tx+s.length*4;x++)put(x,y,0);text(s,tx,ty,10);}}
-let last=performance.now(),T=0;
+let last=performance.now(),T=0;loadDeck();
 let frameErr=0;function frame(now){try{frame0(now);}catch(e){if(!frameErr){frameErr=1;console.warn('frame error (logged once):',e);}last=now;}requestAnimationFrame(frame);}
 function frame0(now){const dt=Math.min(0.05,(now-last)/1000);last=now;T+=dt;
   physics(dt,T);updTurn(dt);updFish(dt,T);updSchools(dt,T);updSea(dt,T);updCrabs(dt,T);updCages(dt,T);updJelly(dt,T);updFreeKing(dt,T);updBoss(dt,T);updDiver(dt,T);updFeed(dt,T);
