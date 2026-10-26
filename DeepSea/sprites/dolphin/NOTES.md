@@ -1,7 +1,9 @@
 # Dolphin sprite — NOTES
 
 Bottlenose dolphin (*Tursiops*) side-view for Finley's Deep Sea tropical lagoon.
-The game loads the three 1× PNGs below (`dolphin_swim.png` frame width 72, plus the stills as fallback). Swim scale is about 0.42 of native so a dolphin reads larger than the shrunk clownfish. Facing follows movement by flipping the right-facing swim strip. Hook, spear, rope, deck, and feed use the reef-fish path; weight is 4.
+The game loads the three 1× PNGs below (`dolphin_swim.png` frame width 72, plus the stills as fallback). Paths live in `DOLPHIN_SPR` in `index.html`; replacing those files reskins the dolphin. Swim scale is about 0.42 of native so a dolphin reads larger than the shrunk clownfish. Facing follows movement by flipping the right-facing swim strip.
+
+Live dolphins have 4 HP. The rod and spear (and jelly stings) chip that down, then the catch uses the reef-fish path at weight 4. A diver next to a living dolphin presses E to ride (2× swim, hold W at the surface to breach). E again, diver damage, or the dolphin dying drops you off.
 
 ## Refs
 - `refs/dolphin/dolphin_side_clean.jpg` — primary side/jump profile
