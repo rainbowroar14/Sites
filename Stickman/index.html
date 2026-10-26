@@ -24,7 +24,6 @@
 <div id="wrap"><canvas id="c" width="640" height="360"></canvas></div>
 <script>
 (function () {
-  // Zoomed out: bigger canvas, smaller stickman
   const W = 640, H = 360;
   const canvas = document.getElementById('c');
   const ctx = canvas.getContext('2d');
@@ -41,211 +40,310 @@
   const SW = 16, SH = 24;
   const SCALE = 2;
   const FOOT_ROW = 20;
-  const GROUND_Y = 300; // top of baseplate in world px
+  const GROUND_Y = 300;
   const WORLD_W = 2400;
 
-  // --- sprite frames -------------------------------------------------
-  const frames = {};
+  // --- pixel helpers -------------------------------------------------
   function makeFrame(drawFn) {
     const c = document.createElement('canvas');
     c.width = SW; c.height = SH;
     const g = c.getContext('2d');
     g.imageSmoothingEnabled = false;
-    function px(x, y) {
-      g.fillStyle = '#111';
+    function px(x, y, col) {
+      g.fillStyle = col || '#111';
       g.fillRect(x | 0, y | 0, 1, 1);
     }
-    function head(hx, hy) {
+    function head(hx, hy, face) {
+      // face: 1 looks right (default), -1 looks left (eye placement)
       const m = [[0,1,1,0],[1,1,1,1],[1,1,1,1],[0,1,1,0]];
       for (let y = 0; y < 4; y++) for (let x = 0; x < 4; x++) if (m[y][x]) px(hx + x, hy + y);
+      // eye / face mark toward facing side (cut a white pixel as “eye socket” look via skip)
+      if (face >= 0) {
+        // right-facing: darker pupil on right of head
+        px(hx + 3, hy + 1, '#111');
+        px(hx + 3, hy + 2, '#111');
+      } else {
+        px(hx + 0, hy + 1, '#111');
+        px(hx + 0, hy + 2, '#111');
+      }
     }
     drawFn(px, head, g);
     return c;
   }
 
-  frames.idle = makeFrame((px, head) => {
-    head(6, 2);
-    px(7, 6); px(8, 6);
-    for (let y = 7; y <= 14; y++) { px(7, y); px(8, y); }
-    // arms out
-    px(4, 8); px(5, 8); px(6, 8); px(9, 8); px(10, 8); px(11, 8);
-    px(3, 9); px(12, 9); px(2, 10); px(13, 10);
-    // legs
-    px(6, 15); px(9, 15);
-    px(5, 16); px(10, 16); px(5, 17); px(10, 17);
-    px(4, 18); px(11, 18); px(4, 19); px(11, 19);
-    px(3, 20); px(4, 20); px(11, 20); px(12, 20);
-  });
+  // Walk cycle drawn facing RIGHT with clear forward lean + stride.
+  // Left uses canvas flip, but we also bake a slight nose/eye so facing reads.
+  function walkFrame(step) {
+    // step 0..5
+    return makeFrame((px, head) => {
+      const bob = (step === 1 || step === 4) ? 0 : 1;
+      const lean = 1; // body shifted toward facing (right)
+      head(6 + lean, 1 + bob);
+      // neck/torso leaned forward
+      px(7 + lean, 5 + bob); px(8 + lean, 5 + bob);
+      for (let y = 6; y <= 13; y++) {
+        px(7 + lean, y + bob); px(8 + lean, y + bob);
+      }
+      // front arm (right) swings opposite to front leg
+      const frontLeg = step % 6;
+      // arm phases
+      const arms = [
+        // step0: left arm back, right arm forward
+        { lx: -2, ly: 1, rx: 3, ry: -1 },
+        { lx: -1, ly: 0, rx: 2, ry: 0 },
+        { lx: 0, ly: 1, rx: 1, ry: 1 },
+        { lx: 2, ly: -1, rx: -2, ry: 1 },
+        { lx: 1, ly: 0, rx: -1, ry: 0 },
+        { lx: 0, ly: 1, rx: 0, ry: 1 },
+      ][frontLeg];
+      const ax = 8 + lean, ay = 7 + bob;
+      // left arm
+      px(ax + arms.lx - 1, ay); px(ax + arms.lx - 2, ay + arms.ly);
+      px(ax + arms.lx - 3, ay + arms.ly + 1);
+      // right arm (forward facing side)
+      px(ax + arms.rx, ay); px(ax + arms.rx + 1, ay + arms.ry);
+      px(ax + arms.rx + 2, ay + arms.ry + (arms.ry < 0 ? -1 : 1));
 
-  frames.walk = [
-    makeFrame((px, head) => {
-      head(6, 2); px(7, 6); px(8, 6);
+      // legs: alternating long stride toward facing
+      const legs = [
+        { l: [-1,0, -2,1, -3,2, -4,3], r: [2,0, 3,1, 3,2, 4,3] },
+        { l: [0,0, -1,1, -1,2, -2,3], r: [1,0, 2,1, 2,2, 3,3] },
+        { l: [1,0, 1,1, 0,2, 0,3], r: [0,0, 0,1, 1,2, 1,3] },
+        { l: [2,0, 3,1, 3,2, 4,3], r: [-1,0, -2,1, -3,2, -4,3] },
+        { l: [1,0, 2,1, 2,2, 3,3], r: [0,0, -1,1, -1,2, -2,3] },
+        { l: [0,0, 0,1, 1,2, 1,3], r: [1,0, 1,1, 0,2, 0,3] },
+      ][frontLeg];
+      const hx = 7 + lean, hy = 14 + bob;
+      for (let i = 0; i < legs.l.length; i += 2) px(hx + legs.l[i], hy + legs.l[i + 1]);
+      for (let i = 0; i < legs.r.length; i += 2) px(hx + 1 + legs.r[i], hy + legs.r[i + 1]);
+      // feet
+      px(hx + legs.l[legs.l.length - 2] - 1, hy + 3);
+      px(hx + 1 + legs.r[legs.r.length - 2] + 1, hy + 3);
+    });
+  }
+
+  function runFrame(step) {
+    return makeFrame((px, head) => {
+      const bob = step % 2;
+      const lean = 2;
+      head(6 + lean, 1 + bob);
+      px(8 + lean, 5 + bob); px(9 + lean, 5 + bob);
+      for (let y = 6; y <= 12; y++) { px(8 + lean, y + bob); px(9 + lean, y + bob); }
+      // pumping arms
+      if (step % 2 === 0) {
+        px(12 + lean, 5); px(13 + lean, 4); px(14 + lean, 3);
+        px(6 + lean, 8); px(5 + lean, 9); px(4 + lean, 10);
+      } else {
+        px(12 + lean, 6); px(13 + lean, 5); px(14 + lean, 4);
+        px(6 + lean, 7); px(5 + lean, 8); px(4 + lean, 9);
+      }
+      const hx = 8 + lean, hy = 13 + bob;
+      if (step % 2 === 0) {
+        px(hx - 2, hy); px(hx - 3, hy + 1); px(hx - 4, hy + 2); px(hx - 5, hy + 3); px(hx - 5, hy + 4);
+        px(hx + 2, hy); px(hx + 3, hy + 1); px(hx + 4, hy + 2); px(hx + 4, hy + 3);
+      } else {
+        px(hx + 2, hy); px(hx + 3, hy + 1); px(hx + 4, hy + 2); px(hx + 5, hy + 3); px(hx + 5, hy + 4);
+        px(hx - 2, hy); px(hx - 3, hy + 1); px(hx - 4, hy + 2); px(hx - 4, hy + 3);
+      }
+    });
+  }
+
+  // Directional jumps: body leans into the jump side (drawn for RIGHT; LEFT uses flip + jumpLeft lean baked)
+  function jumpUpFrame(dir) {
+    // dir +1 right lean, -1 left lean (when not flipping)
+    return makeFrame((px, head) => {
+      const lean = dir > 0 ? 2 : -1;
+      head(6 + lean, 0);
+      px(7 + lean, 4); px(8 + lean, 4);
+      for (let y = 5; y <= 12; y++) { px(7 + lean, y); px(8 + lean, y); }
+      // arms swept back opposite travel (trail)
+      if (dir > 0) {
+        px(5 + lean, 6); px(4 + lean, 5); px(3 + lean, 4); px(2 + lean, 3);
+        px(4 + lean, 7); px(3 + lean, 8);
+        // leading arm tucked forward
+        px(10 + lean, 6); px(11 + lean, 5); px(12 + lean, 4);
+      } else {
+        px(10 + lean, 6); px(11 + lean, 5); px(12 + lean, 4); px(13 + lean, 3);
+        px(11 + lean, 7); px(12 + lean, 8);
+        px(5 + lean, 6); px(4 + lean, 5); px(3 + lean, 4);
+      }
+      // legs: front knee up toward dir, back leg trail
+      if (dir > 0) {
+        px(9 + lean, 13); px(10 + lean, 14); px(11 + lean, 15); px(12 + lean, 15);
+        px(6 + lean, 13); px(5 + lean, 14); px(4 + lean, 15); px(4 + lean, 16);
+      } else {
+        px(6 + lean, 13); px(5 + lean, 14); px(4 + lean, 15); px(3 + lean, 15);
+        px(9 + lean, 13); px(10 + lean, 14); px(11 + lean, 15); px(11 + lean, 16);
+      }
+    });
+  }
+
+  function fallFrame(dir) {
+    return makeFrame((px, head) => {
+      const lean = dir > 0 ? 1 : 0;
+      head(6 + lean, 2);
+      px(7 + lean, 6); px(8 + lean, 6);
+      for (let y = 7; y <= 14; y++) { px(7 + lean, y); px(8 + lean, y); }
+      if (dir > 0) {
+        px(5, 8); px(4, 9); px(3, 10); px(2, 11);
+        px(10, 8); px(11, 9); px(12, 10);
+        px(6, 15); px(5, 16); px(5, 17); px(4, 18);
+        px(9, 15); px(10, 16); px(11, 17); px(11, 18);
+      } else {
+        px(10, 8); px(11, 9); px(12, 10); px(13, 11);
+        px(5, 8); px(4, 9); px(3, 10);
+        px(9, 15); px(10, 16); px(10, 17); px(11, 18);
+        px(6, 15); px(5, 16); px(4, 17); px(4, 18);
+      }
+    });
+  }
+
+  const frames = {
+    idle: makeFrame((px, head) => {
+      head(6, 2);
+      px(7, 6); px(8, 6);
       for (let y = 7; y <= 14; y++) { px(7, y); px(8, y); }
-      // swinging arms
-      px(5, 8); px(6, 8); px(4, 9); px(3, 10);
-      px(9, 8); px(10, 8); px(11, 9); px(12, 10);
-      // stride: left forward, right back
-      px(6, 15); px(5, 16); px(4, 17); px(3, 18); px(2, 19); px(1, 20); px(2, 20);
-      px(9, 15); px(10, 16); px(10, 17); px(11, 18); px(11, 19); px(11, 20); px(12, 20);
+      px(4, 8); px(5, 8); px(6, 8); px(9, 8); px(10, 8); px(11, 8);
+      px(3, 9); px(12, 9); px(2, 10); px(13, 10);
+      px(6, 15); px(9, 15);
+      px(5, 16); px(10, 16); px(5, 17); px(10, 17);
+      px(4, 18); px(11, 18); px(4, 19); px(11, 19);
+      px(3, 20); px(4, 20); px(11, 20); px(12, 20);
     }),
-    makeFrame((px, head) => {
-      head(6, 1); px(7, 5); px(8, 5); // slight bob
-      for (let y = 6; y <= 13; y++) { px(7, y); px(8, y); }
-      px(5, 7); px(6, 7); px(4, 8); px(3, 9);
-      px(9, 7); px(10, 7); px(11, 8); px(12, 9);
-      px(7, 14); px(8, 14); px(7, 15); px(8, 15);
-      px(6, 16); px(9, 16); px(5, 17); px(10, 17);
-      px(5, 18); px(10, 18); px(4, 19); px(11, 19);
-      px(4, 20); px(5, 20); px(10, 20); px(11, 20);
-    }),
-    makeFrame((px, head) => {
-      head(6, 2); px(7, 6); px(8, 6);
-      for (let y = 7; y <= 14; y++) { px(7, y); px(8, y); }
-      px(9, 8); px(10, 8); px(11, 9); px(12, 10);
-      px(5, 8); px(6, 8); px(4, 9); px(3, 10);
-      // opposite stride
-      px(9, 15); px(10, 16); px(11, 17); px(12, 18); px(13, 19); px(13, 20); px(14, 20);
-      px(6, 15); px(5, 16); px(5, 17); px(4, 18); px(4, 19); px(3, 20); px(4, 20);
-    }),
-    makeFrame((px, head) => {
-      head(6, 1); px(7, 5); px(8, 5);
-      for (let y = 6; y <= 13; y++) { px(7, y); px(8, y); }
-      px(5, 7); px(6, 7); px(4, 8); px(3, 9);
-      px(9, 7); px(10, 7); px(11, 8); px(12, 9);
-      px(7, 14); px(8, 14); px(7, 15); px(8, 15);
-      px(6, 16); px(9, 16); px(5, 17); px(10, 17);
-      px(5, 18); px(10, 18); px(4, 19); px(11, 19);
-      px(4, 20); px(5, 20); px(10, 20); px(11, 20);
-    }),
-  ];
-
-  frames.run = [
-    makeFrame((px, head) => {
-      head(6, 2); px(7, 6); px(8, 6);
-      for (let y = 7; y <= 13; y++) { px(7, y); px(8, y); }
-      // lean forward arms
-      px(9, 7); px(10, 7); px(11, 6); px(12, 5);
-      px(5, 8); px(4, 9); px(3, 10); px(2, 11);
-      px(6, 14); px(5, 15); px(4, 16); px(3, 17); px(2, 18); px(1, 19); px(1, 20); px(2, 20);
-      px(9, 14); px(10, 15); px(11, 16); px(12, 17); px(12, 18); px(13, 19); px(13, 20);
-    }),
-    makeFrame((px, head) => {
-      head(6, 1); px(7, 5); px(8, 5);
-      for (let y = 6; y <= 12; y++) { px(7, y); px(8, y); }
-      px(9, 6); px(10, 5); px(11, 4);
-      px(5, 7); px(4, 8); px(3, 9);
-      px(7, 13); px(8, 13); px(7, 14); px(8, 14);
-      px(6, 15); px(9, 15); px(5, 16); px(10, 16);
-      px(4, 17); px(11, 17); px(4, 18); px(11, 18);
-      px(3, 19); px(4, 19); px(11, 19); px(12, 19);
-      px(3, 20); px(12, 20);
-    }),
-    makeFrame((px, head) => {
-      head(6, 2); px(7, 6); px(8, 6);
-      for (let y = 7; y <= 13; y++) { px(7, y); px(8, y); }
-      px(9, 7); px(10, 7); px(11, 6); px(12, 5);
-      px(5, 8); px(4, 9); px(3, 10); px(2, 11);
-      px(9, 14); px(10, 15); px(11, 16); px(12, 17); px(13, 18); px(14, 19); px(14, 20); px(13, 20);
-      px(6, 14); px(5, 15); px(4, 16); px(3, 17); px(3, 18); px(2, 19); px(2, 20);
-    }),
-    makeFrame((px, head) => {
-      head(6, 1); px(7, 5); px(8, 5);
-      for (let y = 6; y <= 12; y++) { px(7, y); px(8, y); }
-      px(9, 6); px(10, 5); px(11, 4);
-      px(5, 7); px(4, 8); px(3, 9);
-      px(7, 13); px(8, 13); px(7, 14); px(8, 14);
-      px(6, 15); px(9, 15); px(5, 16); px(10, 16);
-      px(4, 17); px(11, 17); px(4, 18); px(11, 18);
-      px(3, 19); px(4, 19); px(11, 19); px(12, 19);
-      px(3, 20); px(12, 20);
-    }),
-  ];
-
-  frames.jump = makeFrame((px, head) => {
-    head(6, 1); px(7, 5); px(8, 5);
-    for (let y = 6; y <= 13; y++) { px(7, y); px(8, y); }
-    // arms up
-    px(5, 6); px(4, 5); px(3, 4); px(2, 3);
-    px(9, 6); px(10, 5); px(11, 4); px(12, 3);
-    // tucks / spread legs
-    px(6, 14); px(5, 15); px(4, 16); px(3, 17); px(3, 18);
-    px(9, 14); px(10, 15); px(11, 16); px(12, 17); px(12, 18);
-  });
-
-  frames.fall = makeFrame((px, head) => {
-    head(6, 2); px(7, 6); px(8, 6);
-    for (let y = 7; y <= 14; y++) { px(7, y); px(8, y); }
-    px(5, 8); px(4, 9); px(3, 10); px(2, 11);
-    px(9, 8); px(10, 9); px(11, 10); px(12, 11);
-    px(6, 15); px(5, 16); px(5, 17); px(4, 18); px(4, 19);
-    px(9, 15); px(10, 16); px(10, 17); px(11, 18); px(11, 19);
-  });
-
-  frames.crouch = makeFrame((px, head) => {
-    // lowered head/torso
-    head(6, 8);
-    px(7, 12); px(8, 12);
-    for (let y = 13; y <= 16; y++) { px(7, y); px(8, y); }
-    px(4, 13); px(5, 13); px(6, 13); px(9, 13); px(10, 13); px(11, 13);
-    px(3, 14); px(12, 14);
-    // crouched legs
-    px(5, 17); px(6, 17); px(9, 17); px(10, 17);
-    px(4, 18); px(5, 18); px(10, 18); px(11, 18);
-    px(3, 19); px(4, 19); px(11, 19); px(12, 19);
-    px(2, 20); px(3, 20); px(12, 20); px(13, 20);
-  });
-
-  frames.crouchWalk = [
-    makeFrame((px, head) => {
-      head(6, 8); px(7, 12); px(8, 12);
+    walk: [0, 1, 2, 3, 4, 5].map(walkFrame),
+    run: [0, 1, 2, 3].map(runFrame),
+    jumpR: jumpUpFrame(1),
+    jumpL: jumpUpFrame(-1),
+    fallR: fallFrame(1),
+    fallL: fallFrame(-1),
+    crouch: makeFrame((px, head) => {
+      head(6, 8);
+      px(7, 12); px(8, 12);
       for (let y = 13; y <= 16; y++) { px(7, y); px(8, y); }
-      px(4, 13); px(5, 13); px(9, 13); px(10, 13);
-      px(5, 17); px(4, 18); px(3, 19); px(2, 20); px(3, 20);
-      px(9, 17); px(10, 18); px(10, 19); px(11, 20); px(12, 20);
+      px(4, 13); px(5, 13); px(6, 13); px(9, 13); px(10, 13); px(11, 13);
+      px(3, 14); px(12, 14);
+      px(5, 17); px(6, 17); px(9, 17); px(10, 17);
+      px(4, 18); px(5, 18); px(10, 18); px(11, 18);
+      px(3, 19); px(4, 19); px(11, 19); px(12, 19);
+      px(2, 20); px(3, 20); px(12, 20); px(13, 20);
     }),
-    makeFrame((px, head) => {
-      head(6, 8); px(7, 12); px(8, 12);
-      for (let y = 13; y <= 16; y++) { px(7, y); px(8, y); }
-      px(4, 13); px(5, 13); px(9, 13); px(10, 13);
-      px(9, 17); px(10, 18); px(11, 19); px(12, 20); px(13, 20);
-      px(5, 17); px(4, 18); px(4, 19); px(3, 20); px(4, 20);
-    }),
-  ];
+    crouchWalk: [
+      makeFrame((px, head) => {
+        head(7, 8);
+        px(8, 12); px(9, 12);
+        for (let y = 13; y <= 16; y++) { px(8, y); px(9, y); }
+        px(5, 13); px(6, 13); px(10, 13); px(11, 13);
+        px(6, 17); px(5, 18); px(4, 19); px(3, 20); px(4, 20);
+        px(10, 17); px(11, 18); px(11, 19); px(12, 20); px(13, 20);
+      }),
+      makeFrame((px, head) => {
+        head(7, 8);
+        px(8, 12); px(9, 12);
+        for (let y = 13; y <= 16; y++) { px(8, y); px(9, y); }
+        px(5, 13); px(6, 13); px(10, 13); px(11, 13);
+        px(10, 17); px(11, 18); px(12, 19); px(13, 20); px(14, 20);
+        px(6, 17); px(5, 18); px(5, 19); px(4, 20); px(5, 20);
+      }),
+    ],
+  };
+
+  // --- double-jump particles (custom pixel burst) --------------------
+  const particles = [];
+  function spawnDoubleJumpBurst(wx, wy) {
+    // ring of black + amber “strength” shards + little stick-slash ticks
+    const cols = ['#111111', '#111111', '#c45a12', '#e89a2e', '#5a5a5a', '#222222'];
+    for (let i = 0; i < 18; i++) {
+      const ang = (Math.PI * 2 * i) / 18 + Math.random() * 0.2;
+      const spd = 40 + Math.random() * 80;
+      particles.push({
+        x: wx, y: wy,
+        vx: Math.cos(ang) * spd,
+        vy: Math.sin(ang) * spd - 30,
+        life: 0.35 + Math.random() * 0.25,
+        max: 0.55,
+        size: Math.random() < 0.35 ? 3 : 2,
+        col: cols[(i + (Math.random() * cols.length)|0) % cols.length],
+        kind: Math.random() < 0.3 ? 'slash' : 'pixel',
+      });
+    }
+    // upward shock ticks
+    for (let i = 0; i < 6; i++) {
+      particles.push({
+        x: wx + (Math.random() * 10 - 5),
+        y: wy + 4,
+        vx: (Math.random() - 0.5) * 20,
+        vy: -60 - Math.random() * 40,
+        life: 0.2 + Math.random() * 0.15,
+        max: 0.35,
+        size: 2,
+        col: '#e89a2e',
+        kind: 'slash',
+      });
+    }
+  }
+
+  function updateParticles(dt) {
+    for (let i = particles.length - 1; i >= 0; i--) {
+      const p = particles[i];
+      p.life -= dt;
+      if (p.life <= 0) { particles.splice(i, 1); continue; }
+      p.x += p.vx * dt;
+      p.y += p.vy * dt;
+      p.vy += 180 * dt; // gravity on shards
+      p.vx *= Math.pow(0.15, dt);
+    }
+  }
+
+  function drawParticles(ox) {
+    for (const p of particles) {
+      const a = Math.max(0, p.life / p.max);
+      ctx.globalAlpha = a;
+      ctx.fillStyle = p.col;
+      const sx = Math.floor(p.x - ox);
+      const sy = Math.floor(p.y);
+      if (p.kind === 'slash') {
+        // short diagonal tick
+        ctx.fillRect(sx, sy, p.size + 1, 1);
+        ctx.fillRect(sx + 1, sy - 1, p.size, 1);
+      } else {
+        ctx.fillRect(sx, sy, p.size, p.size);
+      }
+    }
+    ctx.globalAlpha = 1;
+  }
 
   // --- input ---------------------------------------------------------
   const keys = Object.create(null);
   const just = Object.create(null);
-  window.addEventListener('keydown', (e) => {
-    const k = e.key.toLowerCase();
+  function downKey(k) {
     if (!keys[k]) just[k] = true;
     keys[k] = true;
+  }
+  function upKey(k) { keys[k] = false; }
+  window.addEventListener('keydown', (e) => {
+    const k = e.key.toLowerCase();
+    downKey(k);
+    if (e.code === 'Space') downKey(' ');
     if (['arrowup','arrowdown','arrowleft','arrowright',' ','w','a','s','d','shift'].includes(k) || e.code === 'Space') {
       e.preventDefault();
     }
   });
   window.addEventListener('keyup', (e) => {
-    keys[e.key.toLowerCase()] = false;
+    upKey(e.key.toLowerCase());
+    if (e.code === 'Space') upKey(' ');
   });
   function pressed(name) {
     if (just[name]) { just[name] = false; return true; }
     return false;
   }
-  // also track Space via code for reliability
-  window.addEventListener('keydown', (e) => {
-    if (e.code === 'Space' && !keys[' ']) just[' '] = true;
-    if (e.code === 'Space') keys[' '] = true;
-  });
-  window.addEventListener('keyup', (e) => {
-    if (e.code === 'Space') keys[' '] = false;
-  });
 
-  // --- player --------------------------------------------------------
+  // --- player (speeds in units/sec) -----------------------------------
   const player = {
     x: WORLD_W * 0.15,
     y: GROUND_Y - (FOOT_ROW + 1) * SCALE,
     vx: 0,
     vy: 0,
-    facing: 1, // 1 right, -1 left
+    facing: 1,
     onGround: true,
     jumpsLeft: 2,
     crouching: false,
@@ -254,13 +352,16 @@
     animT: 0,
   };
 
-  const WALK_SPEED = 1.6;
-  const RUN_SPEED = 3.4;
-  const CROUCH_SPEED = 0.9;
-  const JUMP_V = -7.2;
-  const DOUBLE_JUMP_V = -6.4;
-  const GRAV = 0.35;
-  const MAX_FALL = 10;
+  const WALK_SPEED = 95;
+  const RUN_SPEED = 200;
+  const CROUCH_SPEED = 55;
+  const ACCEL = 900;
+  const FRICTION_G = 12;
+  const FRICTION_A = 2;
+  const JUMP_V = -320;
+  const DOUBLE_JUMP_V = -290;
+  const GRAV = 980;
+  const MAX_FALL = 520;
 
   let camX = 0;
 
@@ -285,52 +386,54 @@
     if (ax !== 0) player.facing = ax > 0 ? 1 : -1;
 
     if (ax !== 0) {
-      player.vx += ax * 0.55;
+      player.vx += ax * ACCEL * dt;
       if (player.vx > maxSpeed) player.vx = maxSpeed;
       if (player.vx < -maxSpeed) player.vx = -maxSpeed;
     } else {
-      // friction
-      player.vx *= player.onGround ? 0.7 : 0.92;
-      if (Math.abs(player.vx) < 0.05) player.vx = 0;
+      const fr = player.onGround ? FRICTION_G : FRICTION_A;
+      const s = Math.exp(-fr * dt);
+      player.vx *= s;
+      if (Math.abs(player.vx) < 4) player.vx = 0;
     }
 
     if (jumpPressed && player.jumpsLeft > 0 && !player.crouching) {
-      const first = player.onGround || player.jumpsLeft === 2;
-      player.vy = first ? JUMP_V : DOUBLE_JUMP_V;
+      const isDouble = !player.onGround && player.jumpsLeft === 1;
+      player.vy = isDouble ? DOUBLE_JUMP_V : JUMP_V;
       player.onGround = false;
       player.jumpsLeft -= 1;
+      if (isDouble) {
+        const cx = player.x + (SW * SCALE) / 2;
+        const cy = player.y + (SH * SCALE) * 0.65;
+        spawnDoubleJumpBurst(cx, cy);
+      }
     }
 
-    // gravity
-    player.vy += GRAV;
+    player.vy += GRAV * dt;
     if (player.vy > MAX_FALL) player.vy = MAX_FALL;
 
-    player.x += player.vx;
-    player.y += player.vy;
+    player.x += player.vx * dt;
+    player.y += player.vy * dt;
 
-    // world bounds
-    const half = (SW * SCALE) / 2;
     if (player.x < 8) { player.x = 8; player.vx = 0; }
     if (player.x > WORLD_W - SW * SCALE - 8) { player.x = WORLD_W - SW * SCALE - 8; player.vx = 0; }
 
-    // ground
     const gy = groundY();
     if (player.y >= gy) {
       player.y = gy;
       player.vy = 0;
-      if (!player.onGround) player.onGround = true;
+      player.onGround = true;
       player.jumpsLeft = 2;
     } else {
       player.onGround = false;
     }
 
-    // animation state
-    const moving = Math.abs(player.vx) > 0.15;
+    const moving = Math.abs(player.vx) > 12;
     if (!player.onGround) {
-      player.anim = player.vy < 0 ? 'jump' : 'fall';
+      if (player.vy < 0) player.anim = player.facing >= 0 ? 'jumpR' : 'jumpL';
+      else player.anim = player.facing >= 0 ? 'fallR' : 'fallL';
     } else if (player.crouching) {
       player.anim = moving ? 'crouchWalk' : 'crouch';
-    } else if (moving && run && Math.abs(player.vx) > WALK_SPEED + 0.2) {
+    } else if (moving && run && Math.abs(player.vx) > WALK_SPEED * 0.85) {
       player.anim = 'run';
     } else if (moving) {
       player.anim = 'walk';
@@ -338,11 +441,11 @@
       player.anim = 'idle';
     }
 
-    // advance frames
-    const speeds = { walk: 0.18, run: 0.28, crouchWalk: 0.12 };
+    // anim advance in real time
+    const fps = { walk: 10, run: 14, crouchWalk: 7 };
     if (Array.isArray(frames[player.anim])) {
-      player.animT += speeds[player.anim] || 0.2;
-      if (player.animT >= 1) {
+      player.animT += dt * (fps[player.anim] || 10);
+      while (player.animT >= 1) {
         player.animT -= 1;
         player.frame = (player.frame + 1) % frames[player.anim].length;
       }
@@ -351,9 +454,10 @@
       player.animT = 0;
     }
 
-    // camera follow (keep player near center)
+    updateParticles(dt);
+
     const target = player.x + (SW * SCALE) / 2 - W / 2;
-    camX += (target - camX) * 0.12;
+    camX += (target - camX) * Math.min(1, 8 * dt);
     if (camX < 0) camX = 0;
     if (camX > WORLD_W - W) camX = WORLD_W - W;
   }
@@ -371,30 +475,34 @@
 
     const ox = Math.floor(camX);
 
-    // baseplate across world
-    const groundScreenY = GROUND_Y;
     ctx.fillStyle = '#3a3a3a';
-    ctx.fillRect(0, groundScreenY, W, H - groundScreenY);
+    ctx.fillRect(0, GROUND_Y, W, H - GROUND_Y);
     ctx.fillStyle = '#5a5a5a';
-    ctx.fillRect(0, groundScreenY, W, 2);
+    ctx.fillRect(0, GROUND_Y, W, 2);
     ctx.fillStyle = '#2e2e2e';
     const startTile = Math.floor(ox / 16) * 16;
     for (let x = startTile; x < ox + W + 16; x += 16) {
-      ctx.fillRect(x - ox, groundScreenY + 2, 1, H - groundScreenY - 2);
+      ctx.fillRect(x - ox, GROUND_Y + 2, 1, H - GROUND_Y - 2);
     }
-
-    // faint horizon line / distance marks so zoom-out feels like a space
     ctx.fillStyle = '#e8e8e8';
     for (let x = startTile; x < ox + W + 64; x += 64) {
-      ctx.fillRect(x - ox, groundScreenY - 1, 8, 1);
+      ctx.fillRect(x - ox, GROUND_Y - 1, 8, 1);
     }
 
-    // stickman
+    drawParticles(ox);
+
     const spr = currentSprite();
     const dx = Math.floor(player.x - ox);
     const dy = Math.floor(player.y);
+    // Walk/run/idle/crouch: flip for left. JumpL/fallL already lean left — still flip
+    // so limbs face correctly when using mirrored right-lean frames... 
+    // jumpL/fallL are drawn with left lean; do NOT flip those. jumpR/fallR: no flip.
+    const airDir = player.anim === 'jumpL' || player.anim === 'fallL' ||
+                   player.anim === 'jumpR' || player.anim === 'fallR';
+    const flip = airDir ? false : (player.facing < 0);
+
     ctx.save();
-    if (player.facing < 0) {
+    if (flip) {
       ctx.translate(dx + SW * SCALE, dy);
       ctx.scale(-1, 1);
       ctx.drawImage(spr, 0, 0, SW, SH, 0, 0, SW * SCALE, SH * SCALE);
@@ -403,7 +511,6 @@
     }
     ctx.restore();
 
-    // tiny controls hint (high contrast)
     ctx.fillStyle = '#888';
     ctx.font = '10px monospace';
     ctx.fillText('A/D walk  Shift run  Space/W jump (x2)  S crouch', 8, 14);
@@ -411,10 +518,10 @@
 
   let last = performance.now();
   function loop(now) {
-    const dt = Math.min(32, now - last);
+    let dt = (now - last) / 1000;
     last = now;
-    // fixed-ish steps
-    update(dt / 16.67);
+    if (dt > 0.05) dt = 0.05; // clamp hitch
+    update(dt);
     draw();
     requestAnimationFrame(loop);
   }
