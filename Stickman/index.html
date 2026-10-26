@@ -21,10 +21,11 @@
 </style>
 </head>
 <body>
-<div id="wrap"><canvas id="c" width="320" height="180"></canvas></div>
+<div id="wrap"><canvas id="c" width="640" height="360"></canvas></div>
 <script>
 (function () {
-  const W = 320, H = 180;
+  // Zoomed out: bigger canvas, smaller stickman
+  const W = 640, H = 360;
   const canvas = document.getElementById('c');
   const ctx = canvas.getContext('2d');
   ctx.imageSmoothingEnabled = false;
@@ -37,85 +38,387 @@
   window.addEventListener('resize', fit);
   fit();
 
-  // Pixel stickman (facing right), drawn into a tiny offscreen buffer then scaled
-  // Frame size 16x24
   const SW = 16, SH = 24;
-  const stick = document.createElement('canvas');
-  stick.width = SW; stick.height = SH;
-  const sctx = stick.getContext('2d');
-  sctx.imageSmoothingEnabled = false;
-
-  function setPx(x, y, on) {
-    if (on) {
-      sctx.fillStyle = '#111';
-      sctx.fillRect(x, y, 1, 1);
-    }
-  }
-
-  function drawStickmanFrame() {
-    sctx.clearRect(0, 0, SW, SH);
-    // head (4x4 circle-ish)
-    const head = [
-      [0,1,1,0],
-      [1,1,1,1],
-      [1,1,1,1],
-      [0,1,1,0],
-    ];
-    for (let y = 0; y < 4; y++) for (let x = 0; x < 4; x++)
-      if (head[y][x]) setPx(6 + x, 2 + y, 1);
-    // neck
-    setPx(7, 6, 1); setPx(8, 6, 1);
-    // torso
-    for (let y = 7; y <= 14; y++) { setPx(7, y, 1); setPx(8, y, 1); }
-    // arms (slightly out, strong stance)
-    setPx(4, 8, 1); setPx(5, 8, 1); setPx(6, 8, 1);
-    setPx(9, 8, 1); setPx(10, 8, 1); setPx(11, 8, 1);
-    setPx(3, 9, 1); setPx(12, 9, 1);
-    setPx(2, 10, 1); setPx(13, 10, 1);
-    // legs
-    setPx(6, 15, 1); setPx(9, 15, 1);
-    setPx(5, 16, 1); setPx(10, 16, 1);
-    setPx(5, 17, 1); setPx(10, 17, 1);
-    setPx(4, 18, 1); setPx(11, 18, 1);
-    setPx(4, 19, 1); setPx(11, 19, 1);
-    setPx(3, 20, 1); setPx(4, 20, 1); setPx(11, 20, 1); setPx(12, 20, 1);
-  }
-  drawStickmanFrame();
-
-  const BASE_TOP = 150;
-  const SCALE = 3; // stickman on screen
-  // Sprite content ends on row 20 (0-indexed); plant that row on the baseplate top.
+  const SCALE = 2;
   const FOOT_ROW = 20;
+  const GROUND_Y = 300; // top of baseplate in world px
+  const WORLD_W = 2400;
+
+  // --- sprite frames -------------------------------------------------
+  const frames = {};
+  function makeFrame(drawFn) {
+    const c = document.createElement('canvas');
+    c.width = SW; c.height = SH;
+    const g = c.getContext('2d');
+    g.imageSmoothingEnabled = false;
+    function px(x, y) {
+      g.fillStyle = '#111';
+      g.fillRect(x | 0, y | 0, 1, 1);
+    }
+    function head(hx, hy) {
+      const m = [[0,1,1,0],[1,1,1,1],[1,1,1,1],[0,1,1,0]];
+      for (let y = 0; y < 4; y++) for (let x = 0; x < 4; x++) if (m[y][x]) px(hx + x, hy + y);
+    }
+    drawFn(px, head, g);
+    return c;
+  }
+
+  frames.idle = makeFrame((px, head) => {
+    head(6, 2);
+    px(7, 6); px(8, 6);
+    for (let y = 7; y <= 14; y++) { px(7, y); px(8, y); }
+    // arms out
+    px(4, 8); px(5, 8); px(6, 8); px(9, 8); px(10, 8); px(11, 8);
+    px(3, 9); px(12, 9); px(2, 10); px(13, 10);
+    // legs
+    px(6, 15); px(9, 15);
+    px(5, 16); px(10, 16); px(5, 17); px(10, 17);
+    px(4, 18); px(11, 18); px(4, 19); px(11, 19);
+    px(3, 20); px(4, 20); px(11, 20); px(12, 20);
+  });
+
+  frames.walk = [
+    makeFrame((px, head) => {
+      head(6, 2); px(7, 6); px(8, 6);
+      for (let y = 7; y <= 14; y++) { px(7, y); px(8, y); }
+      // swinging arms
+      px(5, 8); px(6, 8); px(4, 9); px(3, 10);
+      px(9, 8); px(10, 8); px(11, 9); px(12, 10);
+      // stride: left forward, right back
+      px(6, 15); px(5, 16); px(4, 17); px(3, 18); px(2, 19); px(1, 20); px(2, 20);
+      px(9, 15); px(10, 16); px(10, 17); px(11, 18); px(11, 19); px(11, 20); px(12, 20);
+    }),
+    makeFrame((px, head) => {
+      head(6, 1); px(7, 5); px(8, 5); // slight bob
+      for (let y = 6; y <= 13; y++) { px(7, y); px(8, y); }
+      px(5, 7); px(6, 7); px(4, 8); px(3, 9);
+      px(9, 7); px(10, 7); px(11, 8); px(12, 9);
+      px(7, 14); px(8, 14); px(7, 15); px(8, 15);
+      px(6, 16); px(9, 16); px(5, 17); px(10, 17);
+      px(5, 18); px(10, 18); px(4, 19); px(11, 19);
+      px(4, 20); px(5, 20); px(10, 20); px(11, 20);
+    }),
+    makeFrame((px, head) => {
+      head(6, 2); px(7, 6); px(8, 6);
+      for (let y = 7; y <= 14; y++) { px(7, y); px(8, y); }
+      px(9, 8); px(10, 8); px(11, 9); px(12, 10);
+      px(5, 8); px(6, 8); px(4, 9); px(3, 10);
+      // opposite stride
+      px(9, 15); px(10, 16); px(11, 17); px(12, 18); px(13, 19); px(13, 20); px(14, 20);
+      px(6, 15); px(5, 16); px(5, 17); px(4, 18); px(4, 19); px(3, 20); px(4, 20);
+    }),
+    makeFrame((px, head) => {
+      head(6, 1); px(7, 5); px(8, 5);
+      for (let y = 6; y <= 13; y++) { px(7, y); px(8, y); }
+      px(5, 7); px(6, 7); px(4, 8); px(3, 9);
+      px(9, 7); px(10, 7); px(11, 8); px(12, 9);
+      px(7, 14); px(8, 14); px(7, 15); px(8, 15);
+      px(6, 16); px(9, 16); px(5, 17); px(10, 17);
+      px(5, 18); px(10, 18); px(4, 19); px(11, 19);
+      px(4, 20); px(5, 20); px(10, 20); px(11, 20);
+    }),
+  ];
+
+  frames.run = [
+    makeFrame((px, head) => {
+      head(6, 2); px(7, 6); px(8, 6);
+      for (let y = 7; y <= 13; y++) { px(7, y); px(8, y); }
+      // lean forward arms
+      px(9, 7); px(10, 7); px(11, 6); px(12, 5);
+      px(5, 8); px(4, 9); px(3, 10); px(2, 11);
+      px(6, 14); px(5, 15); px(4, 16); px(3, 17); px(2, 18); px(1, 19); px(1, 20); px(2, 20);
+      px(9, 14); px(10, 15); px(11, 16); px(12, 17); px(12, 18); px(13, 19); px(13, 20);
+    }),
+    makeFrame((px, head) => {
+      head(6, 1); px(7, 5); px(8, 5);
+      for (let y = 6; y <= 12; y++) { px(7, y); px(8, y); }
+      px(9, 6); px(10, 5); px(11, 4);
+      px(5, 7); px(4, 8); px(3, 9);
+      px(7, 13); px(8, 13); px(7, 14); px(8, 14);
+      px(6, 15); px(9, 15); px(5, 16); px(10, 16);
+      px(4, 17); px(11, 17); px(4, 18); px(11, 18);
+      px(3, 19); px(4, 19); px(11, 19); px(12, 19);
+      px(3, 20); px(12, 20);
+    }),
+    makeFrame((px, head) => {
+      head(6, 2); px(7, 6); px(8, 6);
+      for (let y = 7; y <= 13; y++) { px(7, y); px(8, y); }
+      px(9, 7); px(10, 7); px(11, 6); px(12, 5);
+      px(5, 8); px(4, 9); px(3, 10); px(2, 11);
+      px(9, 14); px(10, 15); px(11, 16); px(12, 17); px(13, 18); px(14, 19); px(14, 20); px(13, 20);
+      px(6, 14); px(5, 15); px(4, 16); px(3, 17); px(3, 18); px(2, 19); px(2, 20);
+    }),
+    makeFrame((px, head) => {
+      head(6, 1); px(7, 5); px(8, 5);
+      for (let y = 6; y <= 12; y++) { px(7, y); px(8, y); }
+      px(9, 6); px(10, 5); px(11, 4);
+      px(5, 7); px(4, 8); px(3, 9);
+      px(7, 13); px(8, 13); px(7, 14); px(8, 14);
+      px(6, 15); px(9, 15); px(5, 16); px(10, 16);
+      px(4, 17); px(11, 17); px(4, 18); px(11, 18);
+      px(3, 19); px(4, 19); px(11, 19); px(12, 19);
+      px(3, 20); px(12, 20);
+    }),
+  ];
+
+  frames.jump = makeFrame((px, head) => {
+    head(6, 1); px(7, 5); px(8, 5);
+    for (let y = 6; y <= 13; y++) { px(7, y); px(8, y); }
+    // arms up
+    px(5, 6); px(4, 5); px(3, 4); px(2, 3);
+    px(9, 6); px(10, 5); px(11, 4); px(12, 3);
+    // tucks / spread legs
+    px(6, 14); px(5, 15); px(4, 16); px(3, 17); px(3, 18);
+    px(9, 14); px(10, 15); px(11, 16); px(12, 17); px(12, 18);
+  });
+
+  frames.fall = makeFrame((px, head) => {
+    head(6, 2); px(7, 6); px(8, 6);
+    for (let y = 7; y <= 14; y++) { px(7, y); px(8, y); }
+    px(5, 8); px(4, 9); px(3, 10); px(2, 11);
+    px(9, 8); px(10, 9); px(11, 10); px(12, 11);
+    px(6, 15); px(5, 16); px(5, 17); px(4, 18); px(4, 19);
+    px(9, 15); px(10, 16); px(10, 17); px(11, 18); px(11, 19);
+  });
+
+  frames.crouch = makeFrame((px, head) => {
+    // lowered head/torso
+    head(6, 8);
+    px(7, 12); px(8, 12);
+    for (let y = 13; y <= 16; y++) { px(7, y); px(8, y); }
+    px(4, 13); px(5, 13); px(6, 13); px(9, 13); px(10, 13); px(11, 13);
+    px(3, 14); px(12, 14);
+    // crouched legs
+    px(5, 17); px(6, 17); px(9, 17); px(10, 17);
+    px(4, 18); px(5, 18); px(10, 18); px(11, 18);
+    px(3, 19); px(4, 19); px(11, 19); px(12, 19);
+    px(2, 20); px(3, 20); px(12, 20); px(13, 20);
+  });
+
+  frames.crouchWalk = [
+    makeFrame((px, head) => {
+      head(6, 8); px(7, 12); px(8, 12);
+      for (let y = 13; y <= 16; y++) { px(7, y); px(8, y); }
+      px(4, 13); px(5, 13); px(9, 13); px(10, 13);
+      px(5, 17); px(4, 18); px(3, 19); px(2, 20); px(3, 20);
+      px(9, 17); px(10, 18); px(10, 19); px(11, 20); px(12, 20);
+    }),
+    makeFrame((px, head) => {
+      head(6, 8); px(7, 12); px(8, 12);
+      for (let y = 13; y <= 16; y++) { px(7, y); px(8, y); }
+      px(4, 13); px(5, 13); px(9, 13); px(10, 13);
+      px(9, 17); px(10, 18); px(11, 19); px(12, 20); px(13, 20);
+      px(5, 17); px(4, 18); px(4, 19); px(3, 20); px(4, 20);
+    }),
+  ];
+
+  // --- input ---------------------------------------------------------
+  const keys = Object.create(null);
+  const just = Object.create(null);
+  window.addEventListener('keydown', (e) => {
+    const k = e.key.toLowerCase();
+    if (!keys[k]) just[k] = true;
+    keys[k] = true;
+    if (['arrowup','arrowdown','arrowleft','arrowright',' ','w','a','s','d','shift'].includes(k) || e.code === 'Space') {
+      e.preventDefault();
+    }
+  });
+  window.addEventListener('keyup', (e) => {
+    keys[e.key.toLowerCase()] = false;
+  });
+  function pressed(name) {
+    if (just[name]) { just[name] = false; return true; }
+    return false;
+  }
+  // also track Space via code for reliability
+  window.addEventListener('keydown', (e) => {
+    if (e.code === 'Space' && !keys[' ']) just[' '] = true;
+    if (e.code === 'Space') keys[' '] = true;
+  });
+  window.addEventListener('keyup', (e) => {
+    if (e.code === 'Space') keys[' '] = false;
+  });
+
+  // --- player --------------------------------------------------------
   const player = {
-    x: Math.floor(W / 2 - (SW * SCALE) / 2),
-    y: BASE_TOP - (FOOT_ROW + 1) * SCALE,
+    x: WORLD_W * 0.15,
+    y: GROUND_Y - (FOOT_ROW + 1) * SCALE,
+    vx: 0,
+    vy: 0,
+    facing: 1, // 1 right, -1 left
+    onGround: true,
+    jumpsLeft: 2,
+    crouching: false,
+    anim: 'idle',
+    frame: 0,
+    animT: 0,
   };
+
+  const WALK_SPEED = 1.6;
+  const RUN_SPEED = 3.4;
+  const CROUCH_SPEED = 0.9;
+  const JUMP_V = -7.2;
+  const DOUBLE_JUMP_V = -6.4;
+  const GRAV = 0.35;
+  const MAX_FALL = 10;
+
+  let camX = 0;
+
+  function groundY() { return GROUND_Y - (FOOT_ROW + 1) * SCALE; }
+
+  function update(dt) {
+    const left = keys['a'] || keys['arrowleft'];
+    const right = keys['d'] || keys['arrowright'];
+    const down = keys['s'] || keys['arrowdown'];
+    const run = keys['shift'];
+    const jumpPressed = pressed(' ') || pressed('w') || pressed('arrowup');
+
+    player.crouching = !!(down && player.onGround);
+
+    let maxSpeed = WALK_SPEED;
+    if (player.crouching) maxSpeed = CROUCH_SPEED;
+    else if (run) maxSpeed = RUN_SPEED;
+
+    let ax = 0;
+    if (left) ax -= 1;
+    if (right) ax += 1;
+    if (ax !== 0) player.facing = ax > 0 ? 1 : -1;
+
+    if (ax !== 0) {
+      player.vx += ax * 0.55;
+      if (player.vx > maxSpeed) player.vx = maxSpeed;
+      if (player.vx < -maxSpeed) player.vx = -maxSpeed;
+    } else {
+      // friction
+      player.vx *= player.onGround ? 0.7 : 0.92;
+      if (Math.abs(player.vx) < 0.05) player.vx = 0;
+    }
+
+    if (jumpPressed && player.jumpsLeft > 0 && !player.crouching) {
+      const first = player.onGround || player.jumpsLeft === 2;
+      player.vy = first ? JUMP_V : DOUBLE_JUMP_V;
+      player.onGround = false;
+      player.jumpsLeft -= 1;
+    }
+
+    // gravity
+    player.vy += GRAV;
+    if (player.vy > MAX_FALL) player.vy = MAX_FALL;
+
+    player.x += player.vx;
+    player.y += player.vy;
+
+    // world bounds
+    const half = (SW * SCALE) / 2;
+    if (player.x < 8) { player.x = 8; player.vx = 0; }
+    if (player.x > WORLD_W - SW * SCALE - 8) { player.x = WORLD_W - SW * SCALE - 8; player.vx = 0; }
+
+    // ground
+    const gy = groundY();
+    if (player.y >= gy) {
+      player.y = gy;
+      player.vy = 0;
+      if (!player.onGround) player.onGround = true;
+      player.jumpsLeft = 2;
+    } else {
+      player.onGround = false;
+    }
+
+    // animation state
+    const moving = Math.abs(player.vx) > 0.15;
+    if (!player.onGround) {
+      player.anim = player.vy < 0 ? 'jump' : 'fall';
+    } else if (player.crouching) {
+      player.anim = moving ? 'crouchWalk' : 'crouch';
+    } else if (moving && run && Math.abs(player.vx) > WALK_SPEED + 0.2) {
+      player.anim = 'run';
+    } else if (moving) {
+      player.anim = 'walk';
+    } else {
+      player.anim = 'idle';
+    }
+
+    // advance frames
+    const speeds = { walk: 0.18, run: 0.28, crouchWalk: 0.12 };
+    if (Array.isArray(frames[player.anim])) {
+      player.animT += speeds[player.anim] || 0.2;
+      if (player.animT >= 1) {
+        player.animT -= 1;
+        player.frame = (player.frame + 1) % frames[player.anim].length;
+      }
+    } else {
+      player.frame = 0;
+      player.animT = 0;
+    }
+
+    // camera follow (keep player near center)
+    const target = player.x + (SW * SCALE) / 2 - W / 2;
+    camX += (target - camX) * 0.12;
+    if (camX < 0) camX = 0;
+    if (camX > WORLD_W - W) camX = WORLD_W - W;
+  }
+
+  function currentSprite() {
+    const f = frames[player.anim];
+    if (Array.isArray(f)) return f[player.frame % f.length];
+    return f;
+  }
 
   function draw() {
     ctx.imageSmoothingEnabled = false;
-    // white background
     ctx.fillStyle = '#ffffff';
     ctx.fillRect(0, 0, W, H);
 
-    // baseplate (pixel ground)
+    const ox = Math.floor(camX);
+
+    // baseplate across world
+    const groundScreenY = GROUND_Y;
     ctx.fillStyle = '#3a3a3a';
-    ctx.fillRect(0, BASE_TOP, W, H - BASE_TOP);
-    // top edge highlight
+    ctx.fillRect(0, groundScreenY, W, H - groundScreenY);
     ctx.fillStyle = '#5a5a5a';
-    ctx.fillRect(0, BASE_TOP, W, 2);
-    // subtle tile lines
+    ctx.fillRect(0, groundScreenY, W, 2);
     ctx.fillStyle = '#2e2e2e';
-    for (let x = 0; x < W; x += 16) ctx.fillRect(x, BASE_TOP + 2, 1, H - BASE_TOP - 2);
+    const startTile = Math.floor(ox / 16) * 16;
+    for (let x = startTile; x < ox + W + 16; x += 16) {
+      ctx.fillRect(x - ox, groundScreenY + 2, 1, H - groundScreenY - 2);
+    }
+
+    // faint horizon line / distance marks so zoom-out feels like a space
+    ctx.fillStyle = '#e8e8e8';
+    for (let x = startTile; x < ox + W + 64; x += 64) {
+      ctx.fillRect(x - ox, groundScreenY - 1, 8, 1);
+    }
 
     // stickman
-    ctx.drawImage(stick, 0, 0, SW, SH, player.x, player.y, SW * SCALE, SH * SCALE);
+    const spr = currentSprite();
+    const dx = Math.floor(player.x - ox);
+    const dy = Math.floor(player.y);
+    ctx.save();
+    if (player.facing < 0) {
+      ctx.translate(dx + SW * SCALE, dy);
+      ctx.scale(-1, 1);
+      ctx.drawImage(spr, 0, 0, SW, SH, 0, 0, SW * SCALE, SH * SCALE);
+    } else {
+      ctx.drawImage(spr, 0, 0, SW, SH, dx, dy, SW * SCALE, SH * SCALE);
+    }
+    ctx.restore();
+
+    // tiny controls hint (high contrast)
+    ctx.fillStyle = '#888';
+    ctx.font = '10px monospace';
+    ctx.fillText('A/D walk  Shift run  Space/W jump (x2)  S crouch', 8, 14);
   }
 
-  function loop() {
+  let last = performance.now();
+  function loop(now) {
+    const dt = Math.min(32, now - last);
+    last = now;
+    // fixed-ish steps
+    update(dt / 16.67);
     draw();
     requestAnimationFrame(loop);
   }
-  loop();
+  requestAnimationFrame(loop);
 })();
 </script>
 </body>
