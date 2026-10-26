@@ -794,7 +794,7 @@ function stepReefFish(e,dt,Tm){
 let last=performance.now(),T=DAY_CYCLE*0.45;loadDeck();
 let frameErr=0;function frame(now){try{frame0(now);}catch(e){if(!frameErr){frameErr=1;console.warn('frame error (logged once):',e);}last=now;}requestAnimationFrame(frame);}
 function frame0(now){const dt=Math.min(0.05,(now-last)/1000);last=now;T+=dt;
-  physics(dt,T);if(HOLD){B.x=HOLD.x;B.y=HOLD.y;B.vx=B.vy=0;}updTurn(dt);updFish(dt,T);updSchools(dt,T);updSea(dt,T);updCrabs(dt,T);updCages(dt,T);updJelly(dt,T);updFreeKing(dt,T);updBoss(dt,T);updDiver(dt,T);updFeed(dt,T);
+  physics(dt,T);if(HOLD){B.x=HOLD.x;B.y=HOLD.y;B.vx=B.vy=0;cx=B.x-W/2;cy=B.y-H/2;}updTurn(dt);updFish(dt,T);updSchools(dt,T);updSea(dt,T);updCrabs(dt,T);updCages(dt,T);updJelly(dt,T);updFreeKing(dt,T);updBoss(dt,T);updDiver(dt,T);updFeed(dt,T);
   const ox=Math.floor(cx),oy=Math.floor(cy);
   // water + sky + surface. Day, night, and the lagoon tint live in seaPixel.
   DAYK=dayK(T);
