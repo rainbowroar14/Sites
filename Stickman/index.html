@@ -1,0 +1,122 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8"/>
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no"/>
+<title>Stickman</title>
+<style>
+  html, body {
+    margin: 0; padding: 0; width: 100%; height: 100%;
+    background: #111; overflow: hidden;
+  }
+  #wrap {
+    position: absolute; inset: 0;
+    display: flex; align-items: center; justify-content: center;
+  }
+  canvas {
+    image-rendering: pixelated;
+    image-rendering: crisp-edges;
+    background: #fff;
+  }
+</style>
+</head>
+<body>
+<div id="wrap"><canvas id="c" width="320" height="180"></canvas></div>
+<script>
+(function () {
+  const W = 320, H = 180;
+  const canvas = document.getElementById('c');
+  const ctx = canvas.getContext('2d');
+  ctx.imageSmoothingEnabled = false;
+
+  function fit() {
+    const s = Math.max(1, Math.floor(Math.min(window.innerWidth / W, window.innerHeight / H)));
+    canvas.style.width = (W * s) + 'px';
+    canvas.style.height = (H * s) + 'px';
+  }
+  window.addEventListener('resize', fit);
+  fit();
+
+  // Pixel stickman (facing right), drawn into a tiny offscreen buffer then scaled
+  // Frame size 16x24
+  const SW = 16, SH = 24;
+  const stick = document.createElement('canvas');
+  stick.width = SW; stick.height = SH;
+  const sctx = stick.getContext('2d');
+  sctx.imageSmoothingEnabled = false;
+
+  function setPx(x, y, on) {
+    if (on) {
+      sctx.fillStyle = '#111';
+      sctx.fillRect(x, y, 1, 1);
+    }
+  }
+
+  function drawStickmanFrame() {
+    sctx.clearRect(0, 0, SW, SH);
+    // head (4x4 circle-ish)
+    const head = [
+      [0,1,1,0],
+      [1,1,1,1],
+      [1,1,1,1],
+      [0,1,1,0],
+    ];
+    for (let y = 0; y < 4; y++) for (let x = 0; x < 4; x++)
+      if (head[y][x]) setPx(6 + x, 2 + y, 1);
+    // neck
+    setPx(7, 6, 1); setPx(8, 6, 1);
+    // torso
+    for (let y = 7; y <= 14; y++) { setPx(7, y, 1); setPx(8, y, 1); }
+    // arms (slightly out, strong stance)
+    setPx(4, 8, 1); setPx(5, 8, 1); setPx(6, 8, 1);
+    setPx(9, 8, 1); setPx(10, 8, 1); setPx(11, 8, 1);
+    setPx(3, 9, 1); setPx(12, 9, 1);
+    setPx(2, 10, 1); setPx(13, 10, 1);
+    // legs
+    setPx(6, 15, 1); setPx(9, 15, 1);
+    setPx(5, 16, 1); setPx(10, 16, 1);
+    setPx(5, 17, 1); setPx(10, 17, 1);
+    setPx(4, 18, 1); setPx(11, 18, 1);
+    setPx(4, 19, 1); setPx(11, 19, 1);
+    setPx(3, 20, 1); setPx(4, 20, 1); setPx(11, 20, 1); setPx(12, 20, 1);
+  }
+  drawStickmanFrame();
+
+  const BASE_TOP = 150;
+  const SCALE = 3; // stickman on screen
+  // Sprite content ends on row 20 (0-indexed); plant that row on the baseplate top.
+  const FOOT_ROW = 20;
+  const player = {
+    x: Math.floor(W / 2 - (SW * SCALE) / 2),
+    y: BASE_TOP - (FOOT_ROW + 1) * SCALE,
+  };
+
+  function draw() {
+    ctx.imageSmoothingEnabled = false;
+    // white background
+    ctx.fillStyle = '#ffffff';
+    ctx.fillRect(0, 0, W, H);
+
+    // baseplate (pixel ground)
+    ctx.fillStyle = '#3a3a3a';
+    ctx.fillRect(0, BASE_TOP, W, H - BASE_TOP);
+    // top edge highlight
+    ctx.fillStyle = '#5a5a5a';
+    ctx.fillRect(0, BASE_TOP, W, 2);
+    // subtle tile lines
+    ctx.fillStyle = '#2e2e2e';
+    for (let x = 0; x < W; x += 16) ctx.fillRect(x, BASE_TOP + 2, 1, H - BASE_TOP - 2);
+
+    // stickman
+    ctx.drawImage(stick, 0, 0, SW, SH, player.x, player.y, SW * SCALE, SH * SCALE);
+  }
+
+  function loop() {
+    draw();
+    requestAnimationFrame(loop);
+  }
+  loop();
+})();
+</script>
+</body>
+</html>
