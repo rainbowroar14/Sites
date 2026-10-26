@@ -142,18 +142,20 @@ function finishHook(e,T){e.onHook=false;if(fish.stick===e)fish.stick=null;const 
 function hookDamage(e,T){if(e.maxhp===undefined)e.maxhp=e.k==='tuna'?2:e.k==='mako'?3:2;if(e.hp===undefined)e.hp=e.maxhp;e.hp--;e.hpShow=T+3;e.flash=T+0.2;fish.tug=1;fish.tick=T+0.5;bleed(e.x,e.y,e.hp<=0?8:4);if(e.hp<=0)finishHook(e,T);}
 function hookOn(e,T){const base=e.k==='tuna'?2:e.k==='mako'?3:(e.maxhp||2);if(e.maxhp===undefined)e.maxhp=base;if(e.hp===undefined)e.hp=e.maxhp;e.onHook=true;e.chase=null;fish.stick=e;hookDamage(e,T);}
 function castKey(){if(fish.st===0){fish.st=1;fish.t=0;clearCast();}else if(fish.st>=2)fish.st=4;}
-function steerHook(dt,T){const [kx,ky]=hookKeys();let hvx=fish.hvx||0,hvy=fish.hvy||0;hvx+=kx*240*dt;hvy+=ky*220*dt;if(!ky)hvy+=40*dt;
-  hvx*=Math.exp(-1.5*dt);hvy*=Math.exp(-1.7*dt);hvx=Math.max(-110,Math.min(110,hvx));hvy=Math.max(-85,Math.min(110,hvy));fish.hvx=hvx;fish.hvy=hvy;
+// Steering accel and speed caps are 0.7×. Up never climbs: it sinks at 10% of the unassisted cruise (SINK_A).
+const ROD_SLOW=0.7,SINK_A=40,SINK_UP=SINK_A/1.7*0.1;
+function steerHook(dt,T){const [kx,ky]=hookKeys();let hvx=fish.hvx||0,hvy=fish.hvy||0;hvx+=kx*240*ROD_SLOW*dt;hvy+=(ky>0?220*ROD_SLOW:ky<0?SINK_A*0.1:SINK_A)*dt;
+  hvx*=Math.exp(-1.5*dt);hvy*=Math.exp(-1.7*dt);hvx=Math.max(-110*ROD_SLOW,Math.min(110*ROD_SLOW,hvx));hvy=Math.max(0,Math.min(ky<0?SINK_UP:110*ROD_SLOW,hvy));fish.hvx=hvx;fish.hvy=hvy;
   fish.x+=hvx*dt;fish.y+=hvy*dt;if(fish.x<WALLX+4){fish.x=WALLX+4;fish.hvx=0;}
   const sf=surfY(fish.x,T)+2;if(fish.y<sf){fish.y=sf;if(fish.hvy<0)fish.hvy=0;}
   const fl=floorY(fish.x)-4;if(fish.y>fl){fish.y=fl;if(fish.hvy>0)fish.hvy=0;}}
-function steerStuck(e,dt){const [kx,ky]=hookKeys();e.vx+=kx*220*dt;e.vy+=ky*200*dt;e.vx*=Math.exp(-1.6*dt);e.vy*=Math.exp(-1.6*dt);e.vx=Math.max(-100,Math.min(100,e.vx));e.vy=Math.max(-90,Math.min(90,e.vy));}
+function steerStuck(e,dt){const [kx,ky]=hookKeys();e.vx+=kx*220*ROD_SLOW*dt;if(ky>0)e.vy+=200*ROD_SLOW*dt;else if(ky<0&&e.vy<0)e.vy=0;e.vx*=Math.exp(-1.6*dt);e.vy*=Math.exp(-1.6*dt);e.vx=Math.max(-100*ROD_SLOW,Math.min(100*ROD_SLOW,e.vx));e.vy=ky<0?Math.max(0,Math.min(SINK_UP,e.vy)):Math.max(-90*ROD_SLOW,Math.min(90*ROD_SLOW,e.vy));}
 function updFish(dt,T){fish.t+=dt;
   if(fish.st===1){const t=fish.t;fish.rod=t<0.15?0.7*t/0.15:Math.max(-0.5,0.7-1.2*(t-0.15)/0.12);
     if(t>=0.24){fish.st=2;fish.x=rodTip[0];fish.y=rodTip[1];fish.vx=-B.face*75+B.vx*0.3;fish.vy=-55;}}
   else fish.rod+=(0-fish.rod)*Math.min(1,6*dt);
   if(fish.st===2){fish.vy+=160*dt;fish.x+=fish.vx*dt;fish.y+=fish.vy*dt;fish.x=Math.max(fish.x,WALLX+4);
-    if(fish.vy>0&&fish.y>surfY(fish.x,T)){fish.st=3;fish.t=0;fish.hvx=Math.max(-110,Math.min(110,fish.vx*0.35));fish.hvy=30;splash(fish.x,surfY(fish.x,T),9,0.45);}}
+    if(fish.vy>0&&fish.y>surfY(fish.x,T)){fish.st=3;fish.t=0;fish.hvx=Math.max(-110*ROD_SLOW,Math.min(110*ROD_SLOW,fish.vx*0.35));fish.hvy=30;splash(fish.x,surfY(fish.x,T),9,0.45);}}
   if(fish.st===3||fish.st===4)tryCatch(T);fish.tug=Math.max(0,(fish.tug||0)-dt*2);
   if(fish.st===3){const e=fish.stick;if(e&&e.onHook&&solo.includes(e))steerStuck(e,dt);else{if(fish.stick)releaseStick();steerHook(dt,T);}}
   else if(fish.st===4){fish.hvx=0;fish.hvy=0;const dx=rodTip[0]-fish.x,dy=rodTip[1]-fish.y,d=Math.hypot(dx,dy);
@@ -237,7 +239,7 @@ function updSea(dt,T){soloSpawn();
     if(s.chase){steer(s,s.chase.x,s.chase.y,26,dt,2.5);const mx=s.x+Math.sign(s.vx||-1)*29,my=s.y+4;
       if(Math.hypot(s.chase.x-mx,s.chase.y-my)<12){solo=solo.filter(e=>e!==s.chase);s.held={bites:0,max:3+Math.floor(Math.random()*2),next:T+1+Math.random()};s.chase=null;bleed(mx,my,10);}}
     else{s.tt-=dt;if(s.tt<=0||Math.hypot(s.tx-s.x,s.ty-s.y)<14){const fl=floorY(s.x);s.tx=s.x+(Math.random()-0.5)*400;s.ty=Math.min(fl-40,400+Math.random()*500);s.tt=8+Math.random()*8;}steer(s,s.tx,s.ty,13,dt,0.6);}}
-  for(const e of solo){if(e.onHook){if(fish.st!==4){e.vx+=Math.sin(T*7+(e.ph||0))*60*dt;e.vy+=Math.cos(T*5.2+(e.ph||0))*36*dt;e.vx=Math.max(-100,Math.min(100,e.vx));e.vy=Math.max(-90,Math.min(90,e.vy));
+  for(const e of solo){if(e.onHook){if(fish.st!==4){e.vx+=Math.sin(T*7+(e.ph||0))*60*dt;e.vy+=Math.cos(T*5.2+(e.ph||0))*36*dt;e.vx=Math.max(-100*ROD_SLOW,Math.min(100*ROD_SLOW,e.vx));e.vy=Math.max(-90*ROD_SLOW,Math.min(90*ROD_SLOW,e.vy));if(hookKeys()[1]<0)e.vy=Math.max(0,Math.min(SINK_UP,e.vy));
       e.x+=e.vx*dt;e.y+=e.vy*dt;const sf=surfY(e.x,T)+6,fl=floorY(e.x)-(e.k==='mako'?20:10);if(e.y<sf){e.y=sf;if(e.vy<0)e.vy=0;}if(e.y>fl){e.y=fl;if(e.vy>0)e.vy=0;}if(e.x<WALLX+16){e.x=WALLX+16;if(e.vx<0)e.vx=0;}
       fish.x=e.x+mouthOx(e);fish.y=e.y;}continue;}const sf=surfY(e.x,T),fl=floorY(e.x),top=e.k==='tuna'?200:380;if(e.y<sf+top*0.9)e.vy+=30*dt;if(e.y>fl-(e.k==='mako'?24:14))e.vy-=40*dt;if(e.x<WALLX+50)e.vx+=40*dt;
     e.x+=e.vx*dt;e.y+=e.vy*dt;if(Math.abs(e.vx)>1)e.face=e.vx>0?1:-1;}
