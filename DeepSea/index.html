@@ -136,11 +136,12 @@ function rodFullMsg(T){if(T<(fish.fullT||0))return;fish.fullT=T+1.2;cageMsg(rodW
 function releaseStick(){if(fish.stick){fish.stick.onHook=false;fish.stick=null;}}
 function clearCast(){releaseStick();fish.load.length=0;fish.caught=null;fish.tick=0;fish.hvx=0;fish.hvy=0;}
 function secureCatch(k,T){const item=k?{t:T,k}:{t:T};fish.load.push(item);fish.caught=item;fish.tug=1;}
-function mouthOx(e){return (e.face||-1)*(e.k==='tuna'?16:28);}
-function hookHasHp(e){return e.k==='tuna'||e.k==='mako'||e.hp!==undefined||e.maxhp;}
-function finishHook(e,T){e.onHook=false;if(fish.stick===e)fish.stick=null;const i=solo.indexOf(e);if(i>=0)solo.splice(i,1);for(const s of solo)if(s.chase===e)s.chase=null;bleed(e.x,e.y,8);if(!rodFit(e.k)){rodFullMsg(T);return;}secureCatch(e.k,T);}
-function hookDamage(e,T){if(e.maxhp===undefined)e.maxhp=e.k==='tuna'?2:e.k==='mako'?3:2;if(e.hp===undefined)e.hp=e.maxhp;e.hp--;e.hpShow=T+3;e.flash=T+0.2;fish.tug=1;fish.tick=T+0.5;bleed(e.x,e.y,e.hp<=0?8:4);if(e.hp<=0)finishHook(e,T);}
-function hookOn(e,T){const base=e.k==='tuna'?2:e.k==='mako'?3:(e.maxhp||2);if(e.maxhp===undefined)e.maxhp=base;if(e.hp===undefined)e.hp=e.maxhp;e.onHook=true;e.chase=null;fish.stick=e;hookDamage(e,T);}
+function mouthOx(e){if(!e||e.k==='jelly'||e.k==='king')return 0;return (e.face||-1)*(e.k==='tuna'?16:28);}
+function hookHasHp(e){return e.k==='tuna'||e.k==='mako'||e.k==='jelly'||e.k==='king'||e.hp!==undefined||e.maxhp;}
+function hookHeld(e){return e&&e.onHook&&(solo.includes(e)||jel.includes(e)||e===GJ||freeKing.includes(e));}
+function finishHook(e,T){e.onHook=false;if(fish.stick===e)fish.stick=null;const i=solo.indexOf(e);if(i>=0)solo.splice(i,1);const ji=jel.indexOf(e);if(ji>=0)jel.splice(ji,1);if(e===GJ){GJ.dead=true;GJ.respT=T+180;GJ.vx=GJ.vy=0;}for(const s of solo)if(s.chase===e)s.chase=null;bleed(e.x,e.y,8);if(!rodFit(e.k)){rodFullMsg(T);return;}secureCatch(e.k,T);}
+function hookDamage(e,T){if(e.maxhp===undefined)e.maxhp=e.hp!==undefined?e.hp:(e.k==='tuna'?2:e.k==='mako'?3:e.k==='king'?10:2);if(e.hp===undefined)e.hp=e.maxhp;e.hp--;e.hpShow=T+3;e.flash=T+0.2;fish.tug=1;fish.tick=T+0.5;bleed(e.x,e.y,e.hp<=0?8:4);if(e.hp<=0)finishHook(e,T);}
+function hookOn(e,T){if(e.k==='jelly'&&e.hp===undefined&&!e.maxhp){e.maxhp=2;e.hp=2;}if(e.k==='king'&&e.hp===undefined&&!e.maxhp){e.maxhp=10;e.hp=10;}e.onHook=true;e.chase=null;fish.stick=e;hookDamage(e,T);}
 function castKey(){if(fish.st===0){fish.st=1;fish.t=0;clearCast();}else if(fish.st>=2)fish.st=4;}
 // Steering accel and speed caps are 0.7×. Up never climbs: it sinks at 10% of the unassisted cruise (SINK_A).
 const ROD_SLOW=0.7,SINK_A=40,SINK_UP=SINK_A/1.7*0.1;
@@ -150,6 +151,7 @@ function steerHook(dt,T){const [kx,ky]=hookKeys();let hvx=fish.hvx||0,hvy=fish.h
   const sf=surfY(fish.x,T)+2;if(fish.y<sf){fish.y=sf;if(fish.hvy<0)fish.hvy=0;}
   const fl=floorY(fish.x)-4;if(fish.y>fl){fish.y=fl;if(fish.hvy>0)fish.hvy=0;}}
 function steerStuck(e,dt){const [kx,ky]=hookKeys();e.vx+=kx*220*ROD_SLOW*dt;if(ky>0)e.vy+=200*ROD_SLOW*dt;else if(ky<0&&e.vy<0)e.vy=0;e.vx*=Math.exp(-1.6*dt);e.vy*=Math.exp(-1.6*dt);e.vx=Math.max(-100*ROD_SLOW,Math.min(100*ROD_SLOW,e.vx));e.vy=ky<0?Math.max(0,Math.min(SINK_UP,e.vy)):Math.max(-90*ROD_SLOW,Math.min(90*ROD_SLOW,e.vy));}
+function hookDrag(e,dt,T){e.x+=e.vx*dt;e.y+=e.vy*dt;const sf=surfY(e.x,T)+(e.k==='king'?12:4),fl=floorY(e.x)-(e.k==='king'?20:8);if(e.y<sf){e.y=sf;if(e.vy<0)e.vy=0;}if(e.y>fl){e.y=fl;if(e.vy>0)e.vy=0;}if(e.x<WALLX+8){e.x=WALLX+8;if(e.vx<0)e.vx=0;}fish.x=e.x+mouthOx(e);fish.y=e.y;}
 function updFish(dt,T){fish.t+=dt;
   if(fish.st===1){const t=fish.t;fish.rod=t<0.15?0.7*t/0.15:Math.max(-0.5,0.7-1.2*(t-0.15)/0.12);
     if(t>=0.24){fish.st=2;fish.x=rodTip[0];fish.y=rodTip[1];fish.vx=-B.face*75+B.vx*0.3;fish.vy=-55;}}
@@ -157,7 +159,7 @@ function updFish(dt,T){fish.t+=dt;
   if(fish.st===2){fish.vy+=160*dt;fish.x+=fish.vx*dt;fish.y+=fish.vy*dt;fish.x=Math.max(fish.x,WALLX+4);
     if(fish.vy>0&&fish.y>surfY(fish.x,T)){fish.st=3;fish.t=0;fish.hvx=Math.max(-110*ROD_SLOW,Math.min(110*ROD_SLOW,fish.vx*0.35));fish.hvy=30;splash(fish.x,surfY(fish.x,T),9,0.45);}}
   if(fish.st===3||fish.st===4)tryCatch(T);fish.tug=Math.max(0,(fish.tug||0)-dt*2);
-  if(fish.st===3){const e=fish.stick;if(e&&e.onHook&&solo.includes(e))steerStuck(e,dt);else{if(fish.stick)releaseStick();steerHook(dt,T);}}
+  if(fish.st===3){const e=fish.stick;if(e&&hookHeld(e)){steerStuck(e,dt);if(!solo.includes(e))hookDrag(e,dt,T);}else{if(fish.stick)releaseStick();steerHook(dt,T);}}
   else if(fish.st===4){fish.hvx=0;fish.hvy=0;const dx=rodTip[0]-fish.x,dy=rodTip[1]-fish.y,d=Math.hypot(dx,dy);
     if(d<4){fish.st=0;releaseStick();if(fish.load.length){for(const f of fish.load)deck.push(newDeck(f.k||'sard'));saveDeck();}fish.load.length=0;fish.caught=null;}
     else{const v=Math.min(d,(60+d*0.6)*dt);fish.x+=dx/d*v;fish.y+=dy/d*v;const e=fish.stick;if(e&&e.onHook){e.x=fish.x-mouthOx(e);e.y=fish.y;e.vx=0;e.vy=0;}}}}
@@ -193,9 +195,12 @@ function drawSchools(T){const tdt=Math.min(0.05,Math.max(0,T-tiltLT));tiltLT=T;f
   drawRot(SARD.frames[((Math.floor(T*7+f.ph)%4)+4)%4],SARDC,f.x-cx,f.y-cy,f.vx>0,tiltOf(f,tdt),T);}}
 function tryCatch(T){
   const stuck=fish.stick;
-  if(stuck){if(!stuck.onHook||solo.indexOf(stuck)<0)fish.stick=null;else{if(T>=(fish.tick||0))hookDamage(stuck,T);return;}}
+  if(stuck){if(!hookHeld(stuck))fish.stick=null;else{if(T>=(fish.tick||0))hookDamage(stuck,T);return;}}
   if(fish.y<surfY(fish.x,T)+1)return;
   let heavy=false;
+  for(let i=jel.length-1;i>=0;i--){const j=jel[i];if(j.onHook||Math.hypot(j.x-fish.x,j.y-fish.y)>=8)continue;j.k='jelly';if(j.vx===undefined)j.vx=0;if(j.vy===undefined)j.vy=0;if(!rodFit('jelly')){heavy=true;continue;}hookOn(j,T);return;}
+  if(!GJ.dead&&!GJ.onHook&&Math.hypot(GJ.x-fish.x,GJ.y-fish.y)<16){GJ.k='king';if(!rodFit('king'))heavy=true;else{hookOn(GJ,T);return;}}
+  for(let i=freeKing.length-1;i>=0;i--){const k=freeKing[i];if(Math.hypot(k.x-fish.x,k.y-fish.y)>=18)continue;if(!rodFit('king')){heavy=true;continue;}freeKing.splice(i,1);secureCatch('king',T);bleed(fish.x,fish.y,8);return;}
   for(let i=solo.length-1;i>=0;i--){const e=solo[i];if(e.held||e.onHook)continue;const ox=mouthOx(e);if(Math.hypot(e.x+ox-fish.x,e.y-fish.y)>=(e.k==='tuna'?6:9))continue;
     if(!rodFit(e.k)){heavy=true;continue;}if(hookHasHp(e)){hookOn(e,T);return;}solo.splice(i,1);for(const s of solo)if(s.chase===e)s.chase=null;secureCatch(e.k,T);bleed(fish.x,fish.y,3);return;}
   for(const [,s] of schools)for(let i=0;i<s.fish.length;i++){const f=s.fish[i];if(Math.abs(f.x-fish.x)<6&&Math.abs(f.y-fish.y)<4){
@@ -689,7 +694,7 @@ const jel=[];(function(){let n=0;const H_=(k)=>hash(k*97+n++);
   for(const y of [1790,2110,2190,2265,2350,2420,2470,2790]){const l=crkL(y),r=crkR(y);jel.push({x:l+(r-l)*(0.3+H_(3)*0.4),y});}
   for(let k=0;k<400&&jel.length<34;k++){const x=RVX+(H_(4)-0.5)*CAVRX*1.9,y=CAVY+(H_(5)-0.5)*CAVRY*1.8;if(inCave(x,y)&&inCave(x+12,y)&&inCave(x-12,y)&&inCave(x,y+14)&&inCave(x,y-12))jel.push({x,y});}
   for(const j of jel)Object.assign(j,{hx:j.x,hy:j.y,ph:hash(Math.round(j.x*7+j.y))*6,vx:0,vy:0});})();
-function updJelly(dt,T){for(const j of jel){const tx=j.hx+Math.sin(T*0.17+j.ph)*14,ty=j.hy+Math.sin(T*0.31+j.ph*1.3)*8;
+function updJelly(dt,T){for(const j of jel){if(j.onHook)continue;const tx=j.hx+Math.sin(T*0.17+j.ph)*14,ty=j.hy+Math.sin(T*0.31+j.ph*1.3)*8;
     const pul=Math.max(0,Math.sin(T*1000/JL.dur/4*Math.PI*0.5+j.ph));j.vx+=((tx-j.x)*0.25-j.vx*0.8)*dt;j.vy+=((ty-j.y)*0.25-j.vy*0.8-pul*3)*dt;
     const nx=j.x+j.vx*dt,ny=j.y+j.vy*dt;if(isOpen(nx,ny+6)&&isOpen(nx,ny-6)){j.x=nx;j.y=ny;}else{j.vx*=-0.5;j.vy*=-0.5;}
     if(DV.on&&T>(DV.stingT||0)&&Math.hypot(DV.x-j.x,DV.y-j.y)<8){const dx=DV.x-j.x,dy=DV.y-j.y,d=Math.hypot(dx,dy)||1;DV.vx+=dx/d*40;DV.vy+=dy/d*40;DV.stingT=T+1.5;DV.stungT=T+1.5;hurt(T);cageMsg(PHP.hp>1?'STUNG! -1 HP':'STUNG!',T,1.5);playDrop(2.6,0.3);}
@@ -788,7 +793,8 @@ function bossHit(T,tx,ty){SPR.hit.add(GJ);GJ.hp--;GJ.flash=T+0.15;bleed(tx,ty,4)
 function gjSteer(tx,ty,sp,dt,T){const dx=tx-GJ.x,dy=ty-GJ.y,d=Math.hypot(dx,dy)||1,pul=0.55+0.45*Math.max(0,Math.sin(T*1000/GJS.dur/4*Math.PI*2));
   GJ.vx+=(dx/d*sp*pul-GJ.vx)*1.4*dt;GJ.vy+=(dy/d*sp*pul-GJ.vy)*1.4*dt;}
 function updBoss(dt,T){if(PHP.hp<PHP.max){if(!PHP.next)PHP.next=T+120;if(T>=PHP.next){PHP.hp++;PHP.next=PHP.hp<PHP.max?T+120:0;cageMsg('+1 HP',T,1.5);}}else PHP.next=0;
-  if(GJ.dead){if(T>GJ.respT){GJ.dead=false;GJ.hp=10;gjReset();}return;}
+  if(GJ.dead){if(T>GJ.respT){GJ.dead=false;GJ.hp=10;GJ.onHook=false;gjReset();}return;}
+  if(GJ.onHook){if(!GJ.soft)GJ.soft=makeSoft(GJ.x,GJ.y);updSoft(GJ.soft,GJ.x,GJ.y,dt,T,true);return;}
   const act=DV.on&&DV.y>CAVY-CAVRY-40&&Math.abs(DV.x-RVX)<CAVRX*1.2;
   if(!act){if(GJ.mode!=='hunt')GJ.mode='hunt';if(GJ.y<CAVY-CAVRY+40){GJ.y=CAVY-CAVRY+40;GJ.vy=Math.max(0,GJ.vy);}gjSteer(GJ.hx+Math.sin(T*0.1)*60,GJ.hy+Math.sin(T*0.17)*30,8,dt,T);}
   else if(PHP.hp>1&&GJ.mode!=='dive'){GJ.mode='hunt';gjSteer(DV.x,DV.y-14,T<GJ.chainT?42:22,dt,T);}
