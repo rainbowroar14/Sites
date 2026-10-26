@@ -19,7 +19,15 @@ function hash2(a,b){return hash(Math.imul(a,73856093)^Math.imul(b,19349663));}
 function vnoise(x,seed){const i=Math.floor(x),f=x-i,u=f*f*(3-2*f);return hash(i*31+seed)*(1-u)+hash((i+1)*31+seed)*u;}
 function vn2(x,y,s){const i=Math.floor(x),j=Math.floor(y),f=x-i,g=y-j,u=f*f*(3-2*f),v=g*g*(3-2*g);const a=hash2(i+s,j),b=hash2(i+1+s,j),c=hash2(i+s,j+1),d=hash2(i+1+s,j+1);return (a*(1-u)+b*u)*(1-v)+(c*(1-u)+d*u)*v;}
 function fbm(x,seed){return vnoise(x/180,seed)*0.55+vnoise(x/60,seed+7)*0.3+vnoise(x/20,seed+13)*0.15;}
-const floorY=x=>WD-110+fbm(x,1)*90;
+// Tropical lagoon sits east of the ravine. DAY_CYCLE (seconds) is one full day+night.
+const TROP0=3200,TROP1=8200,DAY_CYCLE=180;
+function smooth01(t){t=t<0?0:t>1?1:t;return t*t*(3-2*t);}
+function tropLook(x){const a=TROP0-520,b=TROP1+520;if(x<=a||x>=b)return 0;if(x<TROP0)return smooth01((x-a)/(TROP0-a));if(x>TROP1)return smooth01((b-x)/(b-TROP1));return 1;}
+function tropShelfT(x){const rise=1600,a=TROP0-rise,b=TROP1+rise;if(x<=a||x>=b)return 0;if(x<TROP0)return (x-a)/rise;if(x>TROP1)return (b-x)/rise;return 1;}
+function tropFloor(x){return 62+Math.sin(x*0.0034)*10+Math.sin(x*0.0105)*6+(fbm(x+500,4)-0.5)*12;}
+function floorY(x){const deep=WD-110+fbm(x,1)*90,shelf=tropFloor(x),t=tropShelfT(x);if(t<=0)return deep;if(t>=1)return shelf;const u=1-Math.pow(1-t,2.35);return deep+(shelf-deep)*u;}
+function dayK(T){const p=((T%DAY_CYCLE)+DAY_CYCLE)%DAY_CYCLE/DAY_CYCLE,sm=smooth01;if(p<0.12)return 0;if(p<0.28)return sm((p-0.12)/0.16);if(p<0.72)return 1;if(p<0.88)return 1-sm((p-0.72)/0.16);return 0;}
+let DAYK=1,HOLD=null;
 // ---- RAVINE: crack at RVX down to a big cavern (open-space test used by diver/spear/cage/render)
 const RVX=1000,CAVY=3170,CAVRX=430,CAVRY=330,DARK0=1650,DARK1=2450;
 // profile (half-width by depth): entrance -> TIGHT squeeze -> chamber -> tight neck -> cavern
@@ -136,7 +144,7 @@ function rodFullMsg(T){if(T<(fish.fullT||0))return;fish.fullT=T+1.2;cageMsg(rodW
 function releaseStick(){if(fish.stick){fish.stick.onHook=false;fish.stick=null;}}
 function clearCast(){releaseStick();fish.load.length=0;fish.caught=null;fish.tick=0;fish.hvx=0;fish.hvy=0;}
 function secureCatch(k,T){const item=k?{t:T,k}:{t:T};fish.load.push(item);fish.caught=item;fish.tug=1;}
-function mouthOx(e){if(!e||e.k==='jelly'||e.k==='king')return 0;return (e.face||-1)*(e.k==='tuna'?16:28);}
+function mouthOx(e){if(!e||e.k==='jelly'||e.k==='king')return 0;const face=e.face||-1;if(e.k==='tuna')return face*16;if(e.k==='nemo')return face*14;if(e.k==='puffer')return face*12;return face*28;}
 function hookHasHp(e){return e.k==='tuna'||e.k==='mako'||e.k==='jelly'||e.k==='king'||e.hp!==undefined||e.maxhp;}
 function hookHeld(e){return e&&e.onHook&&(solo.includes(e)||jel.includes(e)||e===GJ||freeKing.includes(e));}
 function finishHook(e,T){e.onHook=false;if(fish.stick===e)fish.stick=null;const i=solo.indexOf(e);if(i>=0)solo.splice(i,1);const ji=jel.indexOf(e);if(ji>=0)jel.splice(ji,1);if(e===GJ){GJ.dead=true;GJ.respT=T+180;GJ.vx=GJ.vy=0;}for(const s of solo)if(s.chase===e)s.chase=null;bleed(e.x,e.y,8);if(!rodFit(e.k)){rodFullMsg(T);return;}secureCatch(e.k,T);}
@@ -168,7 +176,7 @@ const SARD={"pal": ["#a89a4a", "#1c2a24", "#4e6a52", "#93a88a", "#dfe4c8"], "fra
 const schools=new Map();
 function updSchools(dt,T){const c0=Math.floor((cx-250)/500),c1=Math.floor((cx+W+250)/500);
   for(let c=c0;c<=c1;c++){if(schools.has(c))continue;const h=hash(c*31+7);const s={c,fish:[]};schools.set(c,s);
-    if(h>0.6||c*500+250<WALLX+60)continue;const n=20+Math.floor(hash(c*31+8)*21),x0=c*500+250,y0=70+hash(c*31+9)*170;
+    if(h>0.6||c*500+250<WALLX+60||tropLook(c*500+250)>0.5)continue;const n=20+Math.floor(hash(c*31+8)*21),x0=c*500+250,y0=70+hash(c*31+9)*170;
     s.tx=x0;s.ty=y0;s.seed=c*1.7;for(let i=0;i<n;i++)s.fish.push({x:x0+(hash(c*97+i)-0.5)*50,y:y0+(hash(c*89+i)-0.5)*24,vx:(hash(c*7+i)-0.5)*10,vy:0,ph:hash(c*13+i)*4});}
   for(const [c,s] of schools){if(c<c0-3||c>c1+3){schools.delete(c);continue;}if(!s.fish.length)continue;
     s.tx=c*500+250+Math.sin(T*0.05+s.seed)*160;s.ty+=(Math.sin(T*0.13+s.seed*3)*14)*dt;
@@ -182,7 +190,7 @@ function updSchools(dt,T){const c0=Math.floor((cx-250)/500),c1=Math.floor((cx+W+
 function drawRot(rows,PC,sx,sy,flip,ang,T,tm=0.55){const wc=[40,104,116],RW=rows[0].length,RH=rows.length,c=Math.cos(ang),s=Math.sin(ang),hw=RW/2,hh=RH/2,R=Math.ceil(Math.hypot(hw,hh))+1;
   for(let dy=-R;dy<=R;dy++)for(let dx=-R;dx<=R;dx++){const u=c*dx+s*dy+hw,v=-s*dx+c*dy+hh,X=Math.floor(u),Y=Math.floor(v);if(X<0||X>=RW||Y<0||Y>=RH)continue;
     const ch=rows[Y][flip?RW-1-X:X];if(ch==='.')continue;let [r,g,b]=PC[+ch];const px=Math.round(sx+dx),py=Math.round(sy+dy);if(px<0||px>=W||py<0||py>=H)continue;
-    const d=py+cy-surfY(px+cx,T);if(d>0){const f=Math.min(tm,0.22+d/400);r=r*(1-f)+wc[0]*f;g=g*(1-f)+wc[1]*f;b=b*(1-f)+wc[2]*f;}
+    const d=py+cy-surfY(px+cx,T);if(d>0){let f=Math.min(tm,0.22+d/400);if(tropLook(px+cx)>0.55)f*=0.28;r=r*(1-f)+wc[0]*f;g=g*(1-f)+wc[1]*f;b=b*(1-f)+wc[2]*f;}
     buf[py*W+px]=0xff000000|((b|0)<<16)|((g|0)<<8)|(r|0);}}
 function tiltOf(e,dt){const dir=e.vx>0?1:-1,a=Math.max(-0.52,Math.min(0.52,Math.atan2(e.vy,Math.abs(e.vx)+1e-3)));e.tilt=(e.tilt||0)+(a*dir-(e.tilt||0))*Math.min(1,4*dt);return e.tilt;}
 let tiltLT=0;
@@ -201,7 +209,7 @@ function tryCatch(T){
   for(let i=jel.length-1;i>=0;i--){const j=jel[i];if(j.onHook||Math.hypot(j.x-fish.x,j.y-fish.y)>=8)continue;j.k='jelly';if(j.vx===undefined)j.vx=0;if(j.vy===undefined)j.vy=0;if(!rodFit('jelly')){heavy=true;continue;}hookOn(j,T);return;}
   if(!GJ.dead&&!GJ.onHook&&Math.hypot(GJ.x-fish.x,GJ.y-fish.y)<16){GJ.k='king';if(!rodFit('king'))heavy=true;else{hookOn(GJ,T);return;}}
   for(let i=freeKing.length-1;i>=0;i--){const k=freeKing[i];if(Math.hypot(k.x-fish.x,k.y-fish.y)>=18)continue;if(!rodFit('king')){heavy=true;continue;}freeKing.splice(i,1);secureCatch('king',T);bleed(fish.x,fish.y,8);return;}
-  for(let i=solo.length-1;i>=0;i--){const e=solo[i];if(e.held||e.onHook)continue;const ox=mouthOx(e);if(Math.hypot(e.x+ox-fish.x,e.y-fish.y)>=(e.k==='tuna'?6:9))continue;
+  for(let i=solo.length-1;i>=0;i--){const e=solo[i];if(e.held||e.onHook)continue;const ox=mouthOx(e);if(Math.hypot(e.x+ox-fish.x,e.y-fish.y)>=(e.k==='nemo'?9:e.k==='puffer'?13:e.k==='tuna'?6:9))continue;
     if(!rodFit(e.k)){heavy=true;continue;}if(hookHasHp(e)){hookOn(e,T);return;}solo.splice(i,1);for(const s of solo)if(s.chase===e)s.chase=null;secureCatch(e.k,T);bleed(fish.x,fish.y,3);return;}
   for(const [,s] of schools)for(let i=0;i<s.fish.length;i++){const f=s.fish[i];if(Math.abs(f.x-fish.x)<6&&Math.abs(f.y-fish.y)<4){
     if(!rodFit('sard')){rodFullMsg(T);return;}s.fish.splice(i,1);secureCatch(null,T);for(let k=0;k<6;k++)spawn(fish.x+(Math.random()-0.5)*4,fish.y,(Math.random()-0.5)*8,-8,0.8+Math.random()*0.6,2);return;}}
@@ -210,13 +218,14 @@ const WORM=[[".32.","1..2",".21."],[".23.","2..1",".12."]],WORMC=[0,"#5a2a2e","#
 function drawHookBait(hx,hy,T){
   if(!fish.load.length){const w=WORM[((Math.floor(T*3)%2)+2)%2];for(let j=0;j<3;j++)for(let i=0;i<4;i++){const ch=w[j][i];if(ch==='.')continue;const X=hx-1+i,Y=hy+2+j;if(X>=0&&X<W&&Y>=0&&Y<H)buf[Y*W+X]=WORMP[+ch];}return;}
   let off=0;for(let n=0;n<fish.load.length;n++){const c=fish.load[n],yy=hy+2+off;
-    if(c.k){const [S,PC]=FSPR(c.k),w=S.frames[0][0].length,sw=Math.sin(T*9+n)*0.25;drawRot(S.frames[((Math.floor(T*12+n)%4)+4)%4],PC,hx+1-Math.sin(sw)*w/2,yy+Math.cos(sw)*w/2,false,Math.PI/2+sw,T);off+=c.k==='mako'||c.k==='king'?16:12;}
+    if(c.k){const sw=Math.sin(T*9+n)*0.25;if(c.k==='nemo'||c.k==='puffer'){if(!drawReefCarry(c.k,hx+1,yy+8,false,Math.PI/2+sw,T,c.k==='puffer'?0.5:0.55,n)){const [S,PC]=FSPR(c.k);drawRot(S.frames[0],PC,hx+1,yy+8,false,Math.PI/2+sw,T);}off+=14;continue;}const [S,PC]=FSPR(c.k),w=S.frames[0][0].length;drawRot(S.frames[((Math.floor(T*12+n)%4)+4)%4],PC,hx+1-Math.sin(sw)*w/2,yy+Math.cos(sw)*w/2,false,Math.PI/2+sw,T);off+=c.k==='mako'||c.k==='king'?16:12;}
     else{const th=Math.round(Math.sin(T*15+n)*1.2);drawSardine(SARD.frames[((Math.floor(T*14+n)%4)+4)%4],hx+1+th,yy,false,T,true);off+=7;}}}
 // ---- solo fish: tuna (22-40m, wandering) and mako sharks (40m+, patrol, hunt tuna)
 const TUNA={"pal": ["#f0b830", "#2c3470", "#141a3a", "#8a8cc0", "#d8d8ec"], "frames": [[".......................000............", "..........11........000...............", "..........232......00.................", "..........2112222222................1.", ".......22211111131312..............01.", "....22211111111111131222..........00..", "...2313333313131313131312222.....100..", ".223133333131004343433131313221.232...", "13424343433344444444444343433311332...", "143434340000004444444434342222..232...", ".2224343000043444343432222......212...", "....222240003434323332...........10...", "........222042222.232............10...", "...........00......00.............00..", "....................00.............1..", ".....................00...............", "......................00..............", "........................0............."], [".......................00.............", "..........11........000...............", "..........232......00...............11", "..........2112222222...............11.", ".......22211111131312.............00..", "....222111111111111312222........100..", "...23133333131313131313132222....100..", ".2231333331310043434331313131111232...", "13424343433344444444444343433111332...", "14343434000000444444443432222...232...", ".222434300004344434343222........10...", "....222240003434343332...........10...", "........2220422222232.............00..", "...........00......00..............0..", "....................00................", ".....................00...............", "......................................", "........................0............."], [".......................000............", "..........11.........00...............", "..........232......000................", "..........2112222.202.............1...", ".......22211111132112............00...", "....22211111111111131222.........00...", "...231333331313131313131222.....10....", ".223133333130004343333131312221111....", "1342434343334444444444434343331111....", "143434340000004444444434343222..10....", ".22243430000434444444342222.....10....", "....2222400034343433322.........10....", "........2220422222232............0....", "...........00......00.................", "....................00................", ".....................00...............", "......................00..............", "........................0............."], [".......................000............", "..........11.........00...............", "..........232......000................", "..........21122222202.............1...", ".......22211111131312.............0...", "....2221111111111113122..........00...", "...23133333131313131313222......00....", ".22313333313100434333313112222..10....", "1342434343334444444444434333311111....", "1434343400000044444444343433221111....", ".222434300004344434443422222....10....", "....2222400034343433322.........00....", "........2220422222232...........00....", "...........00......00............0....", "....................00................", ".....................00...............", "......................00..............", "........................0............."]]},MAKO={"pal": ["#1e2228", "#8a9098", "#c4c8cc", "#50565e", "#f0f2f2"], "frames": [["...........................000..................................", "..........................0110..................................", ".........................02110................................3.", ".........................01210.............................3333.", "........................012120...........................00133..", "........................011110..........................01113...", ".......................0112120.........................01120....", ".....................0013131310.......................011210....", "...............0000003131313111000...................011210.....", "..........00000333333333333333333300000..............03110......", ".......000333333333333333333333333333310000.33......012220......", "....0003333333333333333133333333333333333330330....031120.......", ".00013131313333331111111211121212121212121111113333111210.......", "311131111111313131122222222224242424242424222213333112220.......", ".0022122222211121242424442444444444444444400420....02220........", "...002221222121212242424244444444444242000..33.....02420........", ".....0022222424242222244444444444442220.............04410.......", ".......0000002222211111224242420000010..............04220.......", ".............000002211110000000.....33...............0420.......", "..................021130..............................020.......", "..................022110...............................333......", "...................01130................................33......", "...................02110........................................", "...................01130........................................", "....................0110........................................", "....................0130........................................", ".....................010........................................", "......................33........................................"], ["...........................000..................................", "..........................0110..............................3333", ".........................02110.............................3333.", ".........................01210...........................00133..", "........................012120..........................01213...", "........................011110.........................01110....", ".......................0112120........................011120....", ".....................0013131310......................031120.....", "...............000000313131311100....................011210.....", "..........000003333333333333333330000000.....3......011210......", ".......0003333333333333333333333333333130000030....011220.......", "....00033333333333333333333333333333333333313330030131120.......", ".00013131313333331111111111121212121212121212121232122210.......", "3111311111113131311222222222242424242424242422000.0222220.......", ".002212222221112124242424244444444444444400000.....022410.......", "...00222122212121224242424244444444424200...........04220.......", ".....0022222424242222244444444444442220..............0420.......", ".......0000002222211111224242422000010...............02210......", ".............0000022111100000000....33................0210......", "..................021130...............................000......", "..................022110........................................", "...................01130........................................", "...................02110........................................", "...................01130........................................", "....................0110........................................", "....................0130........................................", ".....................010........................................", "......................33........................................"], ["............................33..................................", "..........................0010............................33....", "..........................0110...........................333....", ".........................01210..........................333.....", "........................012120.........................0113.....", "........................021110........................0110......", ".......................0112120........................0120......", ".....................001313130.......................0120.......", "...............0000003131313110......................0210.......", "..........000003333333333333313000000...............0110........", ".......00013333333333333333333333313100000...3.....01120........", "....0003333333333333333333333333333333333300030....03210........", ".000131313133331311111111111111111111113131111133331220.........", "3111311111113131311222222222222224222222222222133332220.........", ".0022122222212121242424242444444444444444444420....0220.........", "...0022212221212122424242424444444444444000000.....02410........", ".....00242424242422222444444444444444200............0420........", ".......0000002222211111224244424200010..............0420........", ".............00000222111000000000...33...............020........", "..................021130..............................33........", "..................022110...............................3........", "...................01130........................................", "...................02110........................................", "...................01130........................................", "....................0110........................................", "....................0130........................................", ".....................010........................................", "......................33........................................"], ["...........................000..................................", "..........................0110..................................", ".........................02110.............................3....", ".........................01210...........................333....", "........................012120..........................333.....", "........................021110.........................3333.....", ".......................0112120........................0123......", ".....................001313130........................010.......", "...............0000003131313110......................0110.......", "..........000003333333333333333000000...............01120.......", ".......0001333333333333333333333331310000...........0120........", "....000333333333333333313333333333333333300000.....03110........", ".000131313133331311111111111211111111313131313000..01120........", "3111311111113131311222222222222224222212121211111331120.........", ".002212222221112124242444244444444444444444442000331220.........", "...0022212221212122424242444444444444444200000.....0220.........", ".....002424242424222224444444444444444400..........0420.........", ".......00000022222111112242424242000120.............040.........", ".............00000222111000000000...33..............0220........", "..................021130.............................010........", "..................022110.............................020........", "...................01130..............................33........", "...................02110........................................", "...................01130........................................", "....................0110........................................", "....................0130........................................", ".....................010........................................", "......................33........................................"]]};const pc=p=>p.pal.map(h=>{const n=parseInt(h.slice(1),16);return [n>>16,(n>>8)&255,n&255];});const TUNAC=pc(TUNA),MAKOC=pc(MAKO);
 let solo=[],soloC=new Set();const blood=[],bones=[];
 function soloSpawn(){const c0=Math.floor((cx-300)/400),c1=Math.floor((cx+W+300)/400);
   for(let c=c0;c<=c1;c++){if(soloC.has(c))continue;soloC.add(c);const x0=c*400+200;if(x0<WALLX+60)continue;
+    if(tropLook(x0)>0.82){spawnReefFish(c,x0);continue;}
     if(hash(c*53+1)<0.55)solo.push({k:'tuna',c,x:x0,y:220+hash(c*53+2)*180,vx:-10,vy:0,ph:hash(c*53+3)*4,tx:x0,ty:300,tt:0});
     if(hash(c*71+5)<0.3){const fl=floorY(x0);solo.push({k:'mako',c,x:x0+90,y:Math.min(fl-40,400+hash(c*71+6)*500),vx:12,vy:0,ph:hash(c*71+7)*4,tx:x0,ty:500,tt:0,cool:0});}}
   solo=solo.filter(e=>{if(e.onHook)return true;const keep=e.x>cx-1400&&e.x<cx+W+1400;if(!keep)soloC.delete(e.c);return keep;});}
@@ -245,8 +254,11 @@ function updSea(dt,T){soloSpawn();
       if(Math.hypot(s.chase.x-mx,s.chase.y-my)<12){solo=solo.filter(e=>e!==s.chase);s.held={bites:0,max:3+Math.floor(Math.random()*2),next:T+1+Math.random()};s.chase=null;bleed(mx,my,10);}}
     else{s.tt-=dt;if(s.tt<=0||Math.hypot(s.tx-s.x,s.ty-s.y)<14){const fl=floorY(s.x);s.tx=s.x+(Math.random()-0.5)*400;s.ty=Math.min(fl-40,400+Math.random()*500);s.tt=8+Math.random()*8;}steer(s,s.tx,s.ty,13,dt,0.6);}}
   for(const e of solo){if(e.onHook){if(fish.st!==4){e.vx+=Math.sin(T*7+(e.ph||0))*60*dt;e.vy+=Math.cos(T*5.2+(e.ph||0))*36*dt;e.vx=Math.max(-100*ROD_SLOW,Math.min(100*ROD_SLOW,e.vx));e.vy=Math.max(-90*ROD_SLOW,Math.min(90*ROD_SLOW,e.vy));if(hookKeys()[1]<0)e.vy=Math.max(0,Math.min(SINK_UP,e.vy));
-      e.x+=e.vx*dt;e.y+=e.vy*dt;const sf=surfY(e.x,T)+6,fl=floorY(e.x)-(e.k==='mako'?20:10);if(e.y<sf){e.y=sf;if(e.vy<0)e.vy=0;}if(e.y>fl){e.y=fl;if(e.vy>0)e.vy=0;}if(e.x<WALLX+16){e.x=WALLX+16;if(e.vx<0)e.vx=0;}
-      fish.x=e.x+mouthOx(e);fish.y=e.y;}continue;}const sf=surfY(e.x,T),fl=floorY(e.x),top=e.k==='tuna'?200:380;if(e.y<sf+top*0.9)e.vy+=30*dt;if(e.y>fl-(e.k==='mako'?24:14))e.vy-=40*dt;if(e.x<WALLX+50)e.vx+=40*dt;
+      e.x+=e.vx*dt;e.y+=e.vy*dt;const sf=surfY(e.x,T)+6,fl=floorY(e.x)-(e.k==='mako'?20:e.k==='puffer'?22:e.k==='nemo'?14:10);if(e.y<sf){e.y=sf;if(e.vy<0)e.vy=0;}if(e.y>fl){e.y=fl;if(e.vy>0)e.vy=0;}if(e.x<WALLX+16){e.x=WALLX+16;if(e.vx<0)e.vx=0;}
+      fish.x=e.x+mouthOx(e);fish.y=e.y;}continue;}
+    if(e.k==='nemo'||e.k==='puffer'){stepReefFish(e,dt,T);continue;}
+    const sf=surfY(e.x,T),fl=floorY(e.x),top=e.k==='tuna'?200:380;if(e.y<sf+top*0.9)e.vy+=30*dt;if(e.y>fl-(e.k==='mako'?24:14))e.vy-=40*dt;if(e.x<WALLX+50)e.vx+=40*dt;
+    if((e.k==='mako'||e.k==='tuna')&&tropLook(e.x)>0.6){const mid=(TROP0+TROP1)*0.5;e.vx+=(e.x<mid?-1:1)*50*dt;e.vy+=28*dt;}
     e.x+=e.vx*dt;e.y+=e.vy*dt;if(Math.abs(e.vx)>1)e.face=e.vx>0?1:-1;}
   for(const b of blood){b.l+=dt;b.x+=(b.vx+Math.sin(T*0.4+b.r0*9)*0.6)*dt;b.y+=b.vy*dt;b.vx*=Math.exp(-0.25*dt);b.vy*=Math.exp(-0.2*dt);}
   for(let i=blood.length-1;i>=0;i--)if(blood[i].l>blood[i].m)blood.splice(i,1);
@@ -254,10 +266,24 @@ function updSea(dt,T){soloSpawn();
   for(let i=bones.length-1;i>=0;i--)if(bones[i].rest&&bones[i].l-bones[i].rt>60)bones.splice(i,1);}
 const BONE=[["..b.b.b..","sBbbbbbbB","..b.b.b.."],["sB","BB"],["b.b","bbb"]],BONEC={b:0xffb8c8d0,B:0xff8898a0,s:0xffc8dce4};
 const FLASHC=[[255,235,235],[255,235,235],[255,235,235],[255,235,235],[255,235,235]];
+const reefImg={swim:null,right:null,left:null};let reefReady=0;
+function grabSheet(src,fw,cb){const im=new Image();im.onload=()=>{try{const n=Math.max(1,Math.round(im.width/fw)),frames=[];for(let f=0;f<n;f++){const c=document.createElement("canvas");c.width=fw;c.height=im.height;const g=c.getContext("2d",{willReadFrequently:true});g.imageSmoothingEnabled=false;g.drawImage(im,-f*fw,0);frames.push({w:fw,h:im.height,d:g.getImageData(0,0,fw,im.height).data});}cb(frames);reefReady++;}catch(err){cb(null);}};im.src=src;}
+function loadReefFish(){grabSheet("sprites/fish/clownfish_swim.png",48,fr=>{reefImg.swim=fr;});grabSheet("sprites/fish/puffer.png",56,fr=>{reefImg.right=fr&&fr[0];});grabSheet("sprites/fish/puffer_left.png",56,fr=>{reefImg.left=fr&&fr[0];});}
+loadReefFish();
+function blitReef(im,sx,sy,mirror,ang,Tm,sc,flash){if(!im)return false;sc=sc||1;ang=ang||0;const w=im.w,h=im.h,c=Math.cos(ang),sn=Math.sin(ang),hw=w/2,hh=h/2,R=Math.ceil(Math.hypot(hw,hh)*sc)+1,dim=flash?1:(0.68+0.32*(typeof DAYK==="number"?DAYK:1));
+  for(let dy=-R;dy<=R;dy++)for(let dx=-R;dx<=R;dx++){let X=Math.floor((c*dx+sn*dy)/sc+hw),Y=Math.floor((-sn*dx+c*dy)/sc+hh);if(X<0||X>=w||Y<0||Y>=h)continue;if(mirror)X=w-1-X;const i=(Y*w+X)*4;if(im.d[i+3]<128)continue;
+    let r=im.d[i]*dim,g=im.d[i+1]*dim,b=im.d[i+2]*dim;if(flash){r=Math.min(255,r*0.35+180);g=Math.min(255,g*0.35+180);b=Math.min(255,b*0.35+180);}const px=Math.round(sx+dx),py=Math.round(sy+dy);if(px<0||px>=W||py<0||py>=H)continue;
+    if(Tm!==undefined){const d=py+cy-surfY(px+cx,Tm);if(d>0){const tw=tropLook(px+cx),f=Math.min(0.36,0.04+d/560)*(1-tw*0.8);r=r*(1-f)+(tw>0.45?48:40)*f;g=g*(1-f)+(tw>0.45?182:104)*f;b=b*(1-f)+(tw>0.45?200:116)*f;}}
+    buf[py*W+px]=0xff000000|((b|0)<<16)|((g|0)<<8)|(r|0);}return true;}
+function reefFr(Tm,ph){return ((Math.floor((Tm||0)*7+(ph||0))%4)+4)%4;}
+function drawReefCarry(k,sx,sy,flip,ang,Tm,sc,ph){if(k==="nemo")return blitReef(reefImg.swim&&reefImg.swim[reefFr(Tm,ph)],sx,sy,!flip,ang,Tm,sc,false);return blitReef(reefImg.right,sx,sy,!flip,ang,Tm,sc,false);}
+function drawReefSwim(e,sx,sy,th,Tm){const face=e.face||(e.vx>=0?1:-1),flash=(e.flash||0)>Tm;if(e.k==="nemo")return blitReef(reefImg.swim&&reefImg.swim[reefFr(Tm,e.ph)],sx,sy,face<0,th,Tm,0.75,flash);if(face<0&&reefImg.left)return blitReef(reefImg.left,sx,sy,false,-th,Tm,0.62,flash);return blitReef(reefImg.right,sx,sy,face<0,th,Tm,0.62,flash);}
 function drawSea(T){
-  for(const e of solo){const S=e.k==='tuna'?TUNA:MAKO,PCc=e.k==='tuna'?TUNAC:MAKOC,w=S.frames[0][0].length,h=S.frames[0].length;
+  for(const e of solo){const reef=e.k==='nemo'||e.k==='puffer',S=e.k==='tuna'?TUNA:e.k==='nemo'?NEMO:e.k==='puffer'?PUFFER:MAKO,PCc=e.k==='tuna'?TUNAC:e.k==='nemo'?NEMOC:e.k==='puffer'?PUFFC:MAKOC,w=reef?(e.k==='puffer'?36:34):S.frames[0][0].length,h=reef?(e.k==='puffer'?30:22):S.frames[0].length;
     const X=Math.round(e.x-cx-w/2),Y=Math.round(e.y-cy-h/2);if(X<-w||X>W||Y<-h||Y>H)continue;
-    const fr=((Math.floor(T*(e.chase||e.flee?10:5)+e.ph)%4)+4)%4,fc=(e.face||-1),th=tiltOf(e.vx===0?Object.assign(e,{vx:fc*0.01}):e,0.016);drawRot(S.frames[fr],(e.flash||0)>T?FLASHC:PCc,e.x-cx,e.y-cy,fc>0,th,T);
+    const fc=(e.face||-1),th=tiltOf(e.vx===0?Object.assign(e,{vx:fc*0.01}):e,0.016);
+    if(reef){if(!drawReefSwim(e,e.x-cx,e.y-cy,th,T))drawRot(S.frames[reefFrame(e,T)],(e.flash||0)>T?FLASHC:PCc,e.x-cx,e.y-cy,fc>0,th,T);}
+    else{const fr=((Math.floor(T*(e.chase||e.flee?10:5)+e.ph)%4)+4)%4;drawRot(S.frames[fr],(e.flash||0)>T?FLASHC:PCc,e.x-cx,e.y-cy,fc>0,th,T);}
     if((e.hpShow||0)>T&&e.hp>0){const px=Math.round(e.x-cx-e.maxhp*2),py=Math.round(e.y-cy-h/2-4);for(let k=0;k<e.maxhp;k++){put(px+k*4,py,0);put(px+k*4+1,py,0);put(px+k*4+2,py,0);put(px+k*4+1,py,k<e.hp?25:23);put(px+k*4+2,py,k<e.hp?25:23);}}
     if(e.held){const ox=fc*29,oy=4,c=Math.cos(th),s=Math.sin(th);drawRot(TUNA.frames[0],TUNAC,e.x-cx+c*ox-s*oy,e.y-cy+s*ox+c*oy,false,th+Math.PI/2,T);}}
   // blood: soft dithered blobs that spread and dilute
@@ -320,7 +346,7 @@ function kelpStalks(layer,x0,x1){const out=[],CH=220;
     const cxw=ch*CH+hash(s+1)*CH,wid=40+hash(s+2)*120,n=4+Math.floor(hash(s+3)*10);
     for(let k=0;k<n;k++){const ks=s*50+k;out.push({x:Math.round(cxw+(hash(ks)-0.5)*wid),h:50+hash(ks+1)*(layer?230:170),ph:hash(ks+2)*6.283,sp:0.25+hash(ks+3)*0.2,seed:ks});}}
   return out;}
-function drawKelp(st,t,par,near){if(near&&!st.lip&&st.x>crkL(floorY(st.x))-4&&st.x<crkR(floorY(st.x))+4)return;
+function drawKelp(st,t,par,near){if(!st.lip&&floorY(st.x)<1100)return;if(near&&!st.lip&&st.x>crkL(floorY(st.x))-4&&st.x<crkR(floorY(st.x))+4)return;
   const rootW=st.x,fy=near?floorY(rootW):farFloorY(rootW);
   let y=fy+2;
   let sx=st.x-cx*par, sy=y-cy;
@@ -431,7 +457,7 @@ function dirName(x,y){const i=((Math.round(Math.atan2(y,x)/(Math.PI/4))%8)+8)%8;
 function nextHop(a,b){if(a===b)return null;if(a==='idle'||b==='idle')return b;if((a==='left'&&b==='right')||(a==='right'&&b==='left'))return b;
   const i=DRING.indexOf(a),j=DRING.indexOf(b),d=((j-i)%8+8)%8;return DRING[(i+(d<=4?1:7))%8];}
 function newDeck(k){return {k,flip:Math.random()<0.5,nf:T+1+Math.random()*4,fl:0};}
-let RL=2,CAP=5;const ROPE=[],RN=48,FW8={sard:1,tuna:2,mako:5,crab:1,gcrab:1,mcrab:1,jelly:1,king:5,cage:2};const carryW=()=>DV.carry.reduce((a,f)=>a+FW8[f.k],0);
+let RL=2,CAP=5;const ROPE=[],RN=48,FW8={sard:1,tuna:2,mako:5,crab:1,gcrab:1,mcrab:1,jelly:1,king:5,cage:2,nemo:1,puffer:2};const carryW=()=>DV.carry.reduce((a,f)=>a+FW8[f.k],0);
 function ropeAnchor(){return [DV.x-(DV.face||1)*3,DV.y+2];}
 function ropeReset(){ROPE.length=0;const [ax,ay]=ropeAnchor();for(let i=0;i<RN;i++)ROPE.push({x:ax-(DV.face||1)*i*RL,y:ay+i*0.5,px:ax-(DV.face||1)*i*RL,py:ay+i*0.5});}
 function updRope(dt,T){if(!ROPE.length)ropeReset();const [ax,ay]=ropeAnchor();ROPE[0].x=ax;ROPE[0].y=ay;
@@ -448,7 +474,7 @@ function releaseFish(f,x,y){if(f.k==='jelly'){jel.push({x,y,hx:x,hy:y,ph:Math.ra
   if(f.k==='mcrab'){crabs.push({c:-999,g:false,x,dir:1,tt:3,walk:true,hideT:T+2,ph:0});return;}
   if(f.k==='crab'||f.k==='gcrab'){crabs.push({c:-999,g:f.k==='gcrab',x,dir:1,tt:3,walk:true,hideT:T+3,ph:0});return;}const d=Math.random()<0.5?-1:1;if(f.k==='sard'){const c=Math.floor(x/500);let s=schools.get(c);if(!s){s={c,fish:[],tx:x,ty:y,seed:0};schools.set(c,s);}if(s.seed===undefined){s.tx=x;s.ty=y;s.seed=0;}s.fish.push({x,y,vx:d*15,vy:0,ph:Math.random()*4});}
   else solo.push({k:f.k,c:-999,x,y,vx:d*20,vy:0,ph:Math.random()*4,tx:x+d*250,ty:y,tt:8,cool:6});}
-const FSPR=k=>k==='sard'?[SARD,SARDC]:k==='tuna'?[TUNA,TUNAC]:k==='crab'?[HSM_S,HERMC]:k==='gcrab'?[HGI_S,HGIC]:k==='mcrab'?[MCRAB,MCRABC]:k==='jelly'?[JLS,JLC]:k==='king'?[GJS,GJC]:k==='cage'?[CG,CGC]:[MAKO,MAKOC];
+const FSPR=k=>k==='sard'?[SARD,SARDC]:k==='tuna'?[TUNA,TUNAC]:k==='nemo'?[NEMO,NEMOC]:k==='puffer'?[PUFFER,PUFFC]:k==='crab'?[HSM_S,HERMC]:k==='gcrab'?[HGI_S,HGIC]:k==='mcrab'?[MCRAB,MCRABC]:k==='jelly'?[JLS,JLC]:k==='king'?[GJS,GJC]:k==='cage'?[CG,CGC]:[MAKO,MAKOC];
 function ropeAt(s){const k=Math.max(0,s/RL),i=Math.min(RN-2,Math.floor(k)),f=Math.min(1,k-i),a=ROPE[i],b=ROPE[i+1];return [a.x+(b.x-a.x)*f,a.y+(b.y-a.y)*f];}
 function ropeNeed(){let s=4;for(const f of DV.carry)s+=(FSPR(f.k)[0].frames[0][0].length)+2;return s;}
 function drawRope(T){if(!ROPE.length)return;const n=Math.min(RN-1,Math.ceil(Math.max(14,ropeNeed())/RL));
@@ -459,6 +485,7 @@ function drawRope(T){if(!ROPE.length)return;const n=Math.min(RN-1,Math.ceil(Math
     if(f.k==='cage'){drawRot(CG.frames[f.lvl],CGC,(p[0]+q[0])/2-cx,(p[1]+q[1])/2-cy,false,Math.sin(T*2+i)*0.08,T,0.12);return;}
     if(f.k==='king'){drawKing((p[0]+q[0])/2,(p[1]+q[1])/2,(fl?a:a-Math.PI)*0.4+Math.sin(T*1.5)*0.05,T,f);return;}
     if(f.k==='jelly'){drawJellyCargo((p[0]+q[0])/2,(p[1]+q[1])/2,(fl?a:a-Math.PI)+flop,T,f);return;}
+    if(f.k==='nemo'||f.k==='puffer'){if(!drawReefCarry(f.k,(p[0]+q[0])/2-cx,(p[1]+q[1])/2-cy,fl,(fl?a:a-Math.PI)+flop,T,f.k==='puffer'?0.5:0.55,i))drawRot(S.frames[0],PC,(p[0]+q[0])/2-cx,(p[1]+q[1])/2-cy,fl,(fl?a:a-Math.PI)+flop,T);return;}
     drawRot(S.frames[((Math.floor(T*(T-(f.fl||-9)<0.4?12:3)+i)%4)+4)%4],PC,(p[0]+q[0])/2-cx,(p[1]+q[1])/2-cy,fl,(fl?a:a-Math.PI)+flop,T);});}
 function exitBoat(){Object.assign(DV,{on:true,x:B.x-B.face*18,y:B.y-6,vx:-B.face*18,vy:-45,hop:1.2,spl:0,cur:'idle',tgt:'idle',q:[],fi:0,ft:0});SPR.st=0;SPR.fish=[];DV.face=-B.face;ROPE.length=0;}
 function tryEnter(){if(!DV.near)return false;DV.sub=false;for(const f of DV.carry.concat(SPR.fish)){if(f.k==='cage'){CC.stock++;for(let i=0;i<f.lvl;i++)deck.push(newDeck('mcrab'));cageMsg('+'+f.lvl+' MUD CRAB'+(f.lvl>1?'S':'')+' TO DECK, CAGE BACK',T,2);}else deck.push(newDeck(f.k));}saveDeck();DV.carry=[];SPR.fish=[];SPR.st=0;DV.on=false;splash(DV.x,surfY(DV.x,T),10,0.5);return true;}
@@ -474,7 +501,7 @@ function skewer(T){const tx=SPR.x,ty=SPR.y;const kingLoad=hasKing()||SPR.fish.so
   for(let i=freeKing.length-1;i>=0;i--){const k=freeKing[i];if(Math.hypot(k.x-tx,k.y-ty)<22){if(hasKing())break;if(DV.carry.length){cageMsg('ROPE FULL — DROP CARGO TO CLAIM KING',T,2);break;}freeKing.splice(i,1);for(const f of SPR.fish)if(f.k!=='king')releaseFish(f,SPR.x,SPR.y);SPR.fish=[{k:'king',ph:0,soft:k.soft,tents:k.tents}];cageMsg('KING JELLY ON YOUR SPEAR! (FULL LOAD)',T,2);bleed(tx,ty,4);break;}}
   if(!kingLoad)for(let i=jel.length-1;i>=0;i--){const j=jel[i];if(Math.hypot(j.x-tx,j.y-ty)<6){jel.splice(i,1);SPR.fish.push({k:'jelly',ph:Math.random()*4});for(let q=0;q<8;q++)spawn(tx,ty,(Math.random()-0.5)*40,(Math.random()-0.5)*40,0.5,0);}}
   if(!kingLoad)for(const [,s] of schools)for(let i=s.fish.length-1;i>=0;i--){const f=s.fish[i];if(Math.hypot(f.x-tx,f.y-ty)<5){s.fish.splice(i,1);SPR.fish.push({k:'sard',ph:Math.random()*4});bleed(tx,ty,3);}}
-  if(!kingLoad)for(let i=solo.length-1;i>=0;i--){const e=solo[i];if(e.onHook)continue;const r=e.k==='tuna'?10:15;if(Math.hypot(e.x-tx,e.y-ty)<r){if(SPR.hit.has(e))continue;SPR.hit.add(e);if(e.hp===undefined)e.hp=e.k==='tuna'?2:3;e.hp--;e.maxhp=e.k==='tuna'?2:3;e.hpShow=T+3;
+  if(!kingLoad)for(let i=solo.length-1;i>=0;i--){const e=solo[i];if(e.onHook)continue;const r=e.k==='nemo'?12:e.k==='puffer'?16:e.k==='tuna'?10:15;if(Math.hypot(e.x-tx,e.y-ty)<r){if(SPR.hit.has(e))continue;SPR.hit.add(e);if(e.hp===undefined)e.hp=e.k==='mako'?3:e.k==='tuna'?2:1;e.hp--;e.maxhp=e.k==='mako'?3:e.k==='tuna'?2:1;e.hpShow=T+3;
     if(e.hp>0){bleed(tx,ty,3);e.flash=T+0.15;e.vx+=Math.cos(SPR.ang)*45;e.vy+=Math.sin(SPR.ang)*45;e.fleeT=T+(e.k==='mako'?6+Math.random()*2:5);SPR.vx*=-0.25;SPR.vy*=-0.25;continue;}solo.splice(i,1);for(const s of solo)if(s.chase===e)s.chase=null;SPR.fish.push({k:e.k,ph:Math.random()*4});bleed(tx,ty,8);}}}
 function updSpear(dt,T){if(!SPR.st)return;const m=muzzle();const ox0=SPR.x,oy0=SPR.y;SPR.age+=dt;if(!keys.Space)SPR.rel=true;
   if(SPR.st===1){const k=Math.exp(-2.2*dt);SPR.vx*=k;SPR.vy*=k;if(Math.hypot(SPR.vx,SPR.vy)<15)SPR.vy+=5*dt;
@@ -503,7 +530,7 @@ function updDiver(dt,T){if(!DV.on)return;const ix=(keys.KeyD||keys.ArrowRight?1:
   RL=2+(DV.sub?Math.min(1.5,Math.hypot(DV.vx,DV.vy)/50):0);
   if(DV.sub&&Math.hypot(DV.vx,DV.vy)>15&&Math.random()<dt*25){const [px,py]=subPos(),hl=Math.hypot(DV.hx,DV.hy)||1;spawn(px-DV.hx/hl*6+(Math.random()-0.5)*2,py-DV.hy/hl*6+(Math.random()-0.5)*2,-DV.vx*0.2+(Math.random()-0.5)*8,-DV.vy*0.2-4,0.6+Math.random()*0.6,2);}
   updRope(dt,T);updSpear(dt,T);DV.near=DV.hop<=0&&Math.hypot(DV.x-B.x,DV.y-B.y)<30;}
-function drawSpearFish(f,x,y,a,T){if(f.k==='king'){drawKing(x,y,Math.sin(T*3)*0.1,T,f);return;}if(f.k==='jelly'){drawJellyCargo(x,y,a,T,f);return;}const [S,PC]=FSPR(f.k);
+function drawSpearFish(f,x,y,a,T){if(f.k==='king'){drawKing(x,y,Math.sin(T*3)*0.1,T,f);return;}if(f.k==='jelly'){drawJellyCargo(x,y,a,T,f);return;}if(f.k==='nemo'||f.k==='puffer'){const fl=Math.cos(a)>0,ang=(fl?a:a-Math.PI)+Math.sin(T*14+f.ph*5)*0.25;if(drawReefCarry(f.k,x-cx,y-cy,fl,ang,T,f.k==='puffer'?0.5:0.55,f.ph))return;}const [S,PC]=FSPR(f.k);
   const fl=Math.cos(a)>0,ang=(fl?a:a-Math.PI)+Math.sin(T*14+f.ph*5)*0.25;drawRot(S.frames[((Math.floor(T*12+f.ph)%4)+4)%4],PC,x-cx,y-cy,fl,ang,T);}
 function drawDiver(T){if(!DV.on||!DV.ready)return;drawRope(T);
   if(SPR.st){const m=muzzle(),c=Math.cos(SPR.ang),s=Math.sin(SPR.ang),tl=[SPR.x-c*8,SPR.y-s*8];
@@ -528,7 +555,8 @@ function drawDeck(c,s_,bx,by,K,F,th,T){const L=(X,Y)=>{let u=(X-15)*K,v=Y-8;if(F
   const n=Math.min(deck.length,9);for(let i=0;i<n;i++){const f=deck[deck.length-n+i];
     if(T>f.nf){f.fl=0.35;f.nf=T+1.5+Math.random()*4;f.flip=!f.flip;}let hop=0;if(f.fl>0){f.fl-=0.016;hop=Math.sin((0.35-f.fl)/0.35*Math.PI)*1.6;}
     const X=1.8+(i%3)*2.6,Y=4.2-Math.floor(i/3)*1.5-hop,[px,py]=L(X,Y);
-    const [S,PC]=FSPR(f.k),sc={sard:0.9,tuna:0.55,mako:0.42,crab:1,gcrab:0.45,mcrab:1,jelly:1,king:0.55}[f.k];
+    if(f.k==='nemo'||f.k==='puffer'){drawReefCarry(f.k,px,py,!f.flip,th+(i%2?0.12:-0.12)+(hop?0.4:0),undefined,f.k==='puffer'?0.32:0.36,i);continue;}
+    const [S,PC]=FSPR(f.k),sc=({sard:0.9,tuna:0.55,mako:0.42,crab:1,gcrab:0.45,mcrab:1,jelly:1,king:0.55,nemo:1,puffer:0.85}[f.k])||1;
     drawRotS(S.frames[0],PC,px,py,f.flip,th+(i%2?0.12:-0.12)+(hop?0.4:0),sc,undefined,P32[16]);}}
 function drawEBox(x,y,K='E'){for(let j=0;j<12;j++)for(let i=0;i<11;i++){const corner=(i==0||i==10)&&(j==0||j==11);if(corner)continue;
     const edge=i==0||i==10||j==0||j==11;let c=edge?28:((i<=1||i>=9||j<=1)?29:(j>=9?32:30));if(!edge&&(i==1||i==9)&&j==1)c=28;put(x+i,y+j,c);}
@@ -546,9 +574,9 @@ addEventListener('mousedown',e=>{if(e.button!==0)return;const r=cv.getBoundingCl
 addEventListener('mouseup',e=>{mouse.down=false;});
 F["+"]="000010111010000";F["/"]="001001010100100";
 // ---- feeding the squid
-const PTS={sard:10,tuna:50,mako:250,crab:25,gcrab:150,mcrab:50,jelly:15,king:1000},THX={sard:"MMM, SARDINE! SALTY LITTLE SNACK. THANKS!",tuna:"A WHOLE TUNA?! YOU SPOIL ME. THANK YOU!",mako:"A SHARK?! CRUNCHY. YOU ARE MY HERO.",crab:"A HERMIT CRAB! CRUNCHY SHELL SNACK.",gcrab:"A GIANT CRAB?! MOSSY AND DELICIOUS!",mcrab:"A MUD CRAB FROM YOUR CAGE! SO FRESH.",jelly:"A GLOWING JELLY! IT TINGLES. I LOVE IT.",king:"THE KING JELLY?! YOU ARE A LEGEND. FEAST!"};
+const PTS={sard:10,tuna:50,mako:250,crab:25,gcrab:150,mcrab:50,jelly:15,king:1000,nemo:30,puffer:40},THX={sard:"MMM, SARDINE! SALTY LITTLE SNACK. THANKS!",tuna:"A WHOLE TUNA?! YOU SPOIL ME. THANK YOU!",mako:"A SHARK?! CRUNCHY. YOU ARE MY HERO.",crab:"A HERMIT CRAB! CRUNCHY SHELL SNACK.",gcrab:"A GIANT CRAB?! MOSSY AND DELICIOUS!",mcrab:"A MUD CRAB FROM YOUR CAGE! SO FRESH.",jelly:"A GLOWING JELLY! IT TINGLES. I LOVE IT.",king:"THE KING JELLY?! YOU ARE A LEGEND. FEAST!",nemo:"A CLOWNFISH! ORANGE AND SNAPPY. THANK YOU!",puffer:"A PUFFER! ROUND AND PRICKLY. I LOVE IT!"};
 const FEED={f:null,fl:[],thank:null,pops:[],eaten:0,yumT:-9,yum:''};let score=0,best=0;const STORE={get(k){try{return window.localStorage.getItem(k);}catch(e){return STORE.m[k]??null;}},set(k,v){STORE.m[k]=String(v);try{window.localStorage.setItem(k,v);}catch(e){}},m:{}};try{best=+(STORE.get('deepsea_best')||0)||0;}catch(e){best=0;}
-const DECK_OK={sard:1,tuna:1,mako:1,crab:1,gcrab:1,mcrab:1,jelly:1,king:1};
+const DECK_OK={sard:1,tuna:1,mako:1,crab:1,gcrab:1,mcrab:1,jelly:1,king:1,nemo:1,puffer:1};
 function saveDeck(){try{STORE.set('deepsea_deck',deck.map(f=>f.k).filter(k=>DECK_OK[k]).join(','));}catch(e){}}
 function loadDeck(){try{const raw=STORE.get('deepsea_deck');if(!raw)return;for(const k of String(raw).split(','))if(DECK_OK[k])deck.push(newDeck(k));}catch(e){}}
 function playDrop(rate,vol){if(!actx||!blipBuf)return;const s=actx.createBufferSource(),g=actx.createGain();s.buffer=blipBuf;s.playbackRate.value=rate;g.gain.value=vol;s.connect(g);g.connect(actx.destination);s.start();}
@@ -568,8 +596,8 @@ function drawBubble(T,top){if(talk.on)return;const near=Math.abs((DV.on?DV.x:B.x
   for(let y=0;y<11;y++)for(let x=0;x<w;x++){const c=(x==0||x==w-1)&&(y==0||y==10);if(c)continue;put(x0+x,y0+y,(x==0||y==0||x==w-1||y==10)?28:10);}
   for(let k=0;k<3;k++)for(let i=0;i<3-k;i++)put(x0+3+i,y0+11+k,i==0||i==2-k?28:10);put(x0+3,y0+13,28);
   text(s,x0+3,y0+3,T<FEED.yumT?13:28);}
-function drawFeed(T){for(const f of FEED.fl){const [S,PC]=FSPR(f.k),sc={sard:0.8,tuna:0.4,mako:0.28,crab:1,gcrab:0.4,mcrab:1,jelly:1,king:0.5}[f.k];
-    drawRotS(S.frames[0],PC,f.x-cx,f.y-cy,false,f.a,sc,T,P32[16]);
+function drawFeed(T){for(const f of FEED.fl){if(f.k==='nemo'||f.k==='puffer'){if(!drawReefCarry(f.k,f.x-cx,f.y-cy,true,f.a,T,f.k==='puffer'?0.42:0.48,0)){const [S,PC]=FSPR(f.k);drawRotS(S.frames[0],PC,f.x-cx,f.y-cy,false,f.a,0.5,T,P32[16]);}}else{const [S,PC]=FSPR(f.k),sc=({sard:0.8,tuna:0.4,mako:0.28,crab:1,gcrab:0.4,mcrab:1,jelly:1,king:0.5}[f.k])||1;
+    drawRotS(S.frames[0],PC,f.x-cx,f.y-cy,false,f.a,sc,T,P32[16]);}
     const left=f.dur-f.t;if(left<0.3){const [mx,my]=feedMouth(T),k=1-left/0.3,ex=mx+(f.x-mx)*k,ey=my+14+(f.y-my-14)*k;
       const n=Math.ceil(Math.hypot(ex-mx,ey-my-14));for(let i=0;i<=n;i++){const q=i/n,X=Math.round(mx+(ex-mx)*q+Math.sin(q*3+T*9)*1.5-cx),Y=Math.round(my+14+(ey-my-14)*q-cy);
         for(const [a,b] of [[0,0],[1,0]])if(X+a>=0&&X+a<W&&Y>=0&&Y<H)buf[Y*W+X+a]=q>0.85?0xff5a60e0:0xff2c1c7a;}}}
@@ -579,7 +607,7 @@ addEventListener('keydown',e=>{if(e.code==='KeyQ'&&!e.repeat)feedKey();});
 const HERMS={"small":{"pal":["#2a1424","#8a2238","#e0484a","#8a6450","#dcbc90"],"w":11,"h":8,"anims":{"walk":[["..0000.0220",".044440000.","0444444220.","0444333220.","04333331220",".000001211.",".....1.21..","..........."],["........00.","..0000.0220",".044440000.","0444443220.","0444433220.","0433333222.",".000001211.","......221.."],["........00.","..0000.0220",".044440000.","0444443220.","0444433220.","0433333222.",".000001211.","......12.1."],["..0000.0220",".044440000.","0444444220.","0444333220.","04333331220",".000001211.","......1.1..","..........."]],"idle":[["..0000.0220",".044440000.","0444444220.","0444333220.","04333331220",".000001211.","......121..","..........."],["..0000.0220",".044440000.","0444444220.","0444333220.","04333331220",".000001211.","......121..","..........."]],"hide":[["...........","..0000.....",".044440....","0444440....","0444430....","04333330...",".000000....","..........."]]},"dur":{"walk":160,"idle":400,"hide":300}},"giant":{"pal":["#1e1a22","#8a2238","#e0484a","#5e6468","#a8b0ac","#5a8a3a","#2e5a2a"],"w":45,"h":42,"anims":{"walk":[[".............................................",".............................................",".............................................",".............................................",".............................................",".............................................",".............................................","....6....666.................................",".....5......56...............................",".....66......66..............................","6.....5.......65.......................00....",".5.....6.......66.....................0220...","..66....66......5...................000220...","...665....6......6.................022000....","......66...666000066000............0220......",".......66.004445454455400...........00.......",".......05654555544545545500...00.00..........",".......044455545455445455440..00.00..........","......04545444455454555454550.00.00..........",".....0455443354544554544543430220220.........","....05545455554454544554544550220220.........","....0544444335455445453433353300000..........","....04445443355444554343533333222200.........","...0354444453444453433533335222222220........","....044455433454544353533535222222220........","....0344444434343535333335322222222220.......","...03344444433433333333333322222222220.......","..04433444443333333333333332121212122200.....","..044433344343333333333333332121222222220....","...044443333333333333333333302122222222220...","....04434333333333333333330000001111111110...",".....033003333333333333330.022001111111110...","......030.000333333333110..0220.011111110....",".......0.....0000000011.....22..1111111......",".....................11.....22..11...........","....................11......22.11............","....................11......22.11............",".............................................",".............................................",".............................................",".............................................","............................................."],[".............................................",".............................................",".............................................",".............................................",".............................................",".............................................",".............................................","..........6..................................","...66.....66.................................",".....65....56................................","......66.....66..............................","6......66......56......................00....","66......56.......6....................0220...",".66......6........5.................000220...","..65......6.......660..............022000....","....6..0...660000006500............0220......",".....6650.005555445455400...........00.......",".......06045554545544545500...00.00..........",".......054544445545455545450..00.00..........","......05544445454455454455440.00.00..........",".....0545455554454544554544550220220.........","....05444555354554454544343530220220.........","....0454544335545455445355333300000..........","....05444445344445453453333533222200.........","...0544455433454544353533535222222220........","....044444433544453533333533222222220........","....0354444534445543335333322222222220.......","...03344444433343333333333322222222220.......","..04433444443343333333333331212121222200.....","..044433343333333333333333331212122222220....","...044443333333333333333333301212222222220...","....04343333333333333333330000001111111110...",".....043003333333333333330.022001111111110...","......030.000333333333110..22....1111111.....",".......0.....00000000011...22.....11111......","......................11..22......11.........","......................11..22......11.........","......................11.22.......11.........",".............................................",".............................................",".............................................","............................................."],[".............................................",".............................................",".............................................",".............................................",".............................................",".............................................",".............................................",".............................................","....6.....66.................................",".....5.....6.................................","......66....6................................","6.......65...5.........................00....",".5........66..666.....................0220...","..6........6.....5..................000220...","..65........6.....66...............022000....","...66.......66000006600............0220......","....66....005555445455400...........00.......","....056.0045554545544545500...00.00..........",".....0.654544445545455545450..00.00..........","......05544445454455454455440.00.00..........",".....0545455554454544554544550220220.........","....05444555354554454544343530220220.........","....0454544335545455445355333300000..........","....05444445344445453453333533222200.........","...0544455433454544353533535222222220........","....044444433544453533333533222222220........","....0354444534445543335333322222222220.......","...03344444433343333333333322222222220.......","..04433444443343333333333331212121222200.....","..044433343333333333333333331212122222220....","...044443333333333333333333301212222222220...","....04343333333333333333330000001111111110...",".....0430033333333333333300022001111111110...","......030.00033333333300111.22...1111111.....",".......0.....000000000...11122....11111......",".........................11122.......11......",".........................11.22......11.......","............................22...............",".............................................",".............................................",".............................................","............................................."],[".............................................",".............................................",".............................................",".............................................",".............................................",".............................................","..........6..................................","....6.....66.................................","....65.....56................................",".....66.....6................................","6.....66.....6.........................00....",".656....66....6.......................0220...","...66.....66...65...................000220...",".....5......6...66..0..............022000....","......60....06000066500............0220......","......650.004445454455400...........00.......",".......60054555544545545500...00.00..........",".......044455545455445455440..00.00..........","......04545444455454555454550.00.00..........",".....0455443354544554544543430220220.........","....05545455554454544554544550220220.........","....0544444335455445453433353300000..........","....04445443355444554343533333222200.........","...0354444453444453433533335222222220........","....044455433454544353533535222222220........","....0344444434343535333335322222222220.......","...03344444433433333333333322222222220.......","..04433444443333333333333332121212122200.....","..044433344343333333333333332121222222220....","...044443333333333333333333302122222222220...","....04434333333333333333330000001111111110...",".....033003333333333333330.022201111111110...","......030.000333333333110...0022211111110....",".......0.....00000000011.......22.11111......","......................11.......22.11.........","......................11.......22.11.........","......................11..........11.........",".............................................",".............................................",".............................................",".............................................","............................................."]],"idle":[[".............................................",".............................................",".............................................",".............................................",".............................................",".............................................",".............................................","....6....666.................................",".....5......56...............................",".....66......66..............................","6.....5.......65.......................00....",".5.....6.......66.....................0220...","..66....66......5...................000220...","...665....6......6.................022000....","......66...666000066000............0220......",".......66.004445454455400...........00.......",".......05654555544545545500...00.00..........",".......044455545455445455440..00.00..........","......04545444455454555454550.00.00..........",".....0455443354544554544543430220220.........","....05545455554454544554544550220220.........","....0544444335455445453433353300000..........","....04445443355444554343533333222200.........","...0354444453444453433533335222222220........","....044455433454544353533535222222220........","....0344444434343535333335322222222220.......","...03344444433433333333333322222222220.......","..04433444443333333333333332121212122200.....","..044433344343333333333333332121222222220....","...044443333333333333333333302122222222220...","....04434333333333333333330000001111111110...",".....033003333333333333330.022001111111110...","......030.000333333333110..0220.011111110....",".......0.....00000000011....22....11111......","......................11....22....11.........","......................11....22....11.........","......................11....22....11.........",".............................................",".............................................",".............................................",".............................................","............................................."],[".............................................",".............................................",".............................................",".............................................",".............................................",".............................................","..........6..................................","...66.....66.................................",".....65....56................................","......66.....66..............................","6......66......56...................00.00....","66......56.......6.................0220220...",".66......6........5................0220220...","..65......6.......660...............00.00....","....6..0...660000006500......................",".....6650.004445454455400....................",".......06054555544545545500...00.00..........",".......044455545455445455440..00.00..........","......04545444455454555454550.00.00..........",".....0455443354544554544543430220220.........","....05545455554454544554544550220220.........","....0544444335455445453433353300000..........","....04445443355444554343533333222200.........","...0354444453444453433533335222222220........","....044455433454544353533535222222220........","....0344444434343535333335322222222220.......","...03344444433433333333333322222222220.......","..04433444443333333333333332121212122200.....","..044433344343333333333333332121222222220....","...044443333333333333333333302122222222220...","....04434333333333333333330000001111111110...",".....033003333333333333330.022001111111110...","......030.000333333333110..0220.011111110....",".......0.....00000000011....22....11111......","......................11....22....11.........","......................11....22....11.........","......................11....22....11.........",".............................................",".............................................",".............................................",".............................................","............................................."]],"hide":[[".............................................",".............................................",".............................................",".............................................",".............................................",".............................................",".............................................",".............................................","....6....666.................................",".....5......56...............................",".....66......66..............................","6.....5.......65.............................",".5.....6.......66............................","..66....66......5............................","...665....6......6...........................","......66...666000066000......................",".......66.005555445455400....................",".......05645554545544545500..................",".......054544445545455545450.................","......05544445454455454455440................",".....0545455554454544554544550...............","....05444555354554454544343530...............","....045454433554545544535533330..............","....054444453444454534533335030..............","...0544455433454544353533535030..............","....044444433544453533333533030..............","....035444453444554333533333030..............","...0334444443334333333333333030..............","..0443344444334333333333333300...............","..044433343333333333333333330................","...04444333333333333333333330................","....043433333333333333333300.................",".....043003333333333333330...................","......030.000333333333000....................",".......0.....000000000.......................",".............................................",".............................................",".............................................",".............................................",".............................................",".............................................","............................................."],[".............................................",".............................................",".............................................",".............................................",".............................................",".............................................",".............................................",".............................................","....6.....66.................................",".....5.....6.................................","......66....6................................","6.......65...5...............................",".5........66..666............................","..6........6.....5...........................","..65........6.....66.........................","...66.......66000006600......................","....66....005555445455400....................","....056.0045554545544545500..................",".....0.654544445545455545450.................","......05544445454455454455440................",".....0545455554454544554544550...............","....05444555354554454544343530...............","....045454433554545544535533330..............","....054444453444454534533335030..............","...0544455433454544353533535030..............","....044444433544453533333533030..............","....035444453444554333533333030..............","...0334444443334333333333333030..............","..0443344444334333333333333300...............","..044433343333333333333333330................","...04444333333333333333333330................","....043433333333333333333300.................",".....043003333333333333330...................","......030.000333333333000....................",".......0.....000000000.......................",".............................................",".............................................",".............................................",".............................................",".............................................",".............................................","............................................."]]},"dur":{"walk":220,"idle":450,"hide":500}}};const HERM=HERMS.small,HGI=HERMS.giant;const pcv=p=>p.map(c=>[parseInt(c.slice(1,3),16),parseInt(c.slice(3,5),16),parseInt(c.slice(5,7),16)]);const HERMC=pcv(HERM.pal),HGIC=pcv(HGI.pal);const HSM_S={frames:HERM.anims.walk},HGI_S={frames:HGI.anims.walk};
 const crabs=[],crabC=new Set();
 function updCrabs(dt,T){const c0=Math.floor((cx-200)/300),c1=Math.floor((cx+W+200)/300);
-  for(let c=c0;c<=c1;c++){if(crabC.has(c))continue;crabC.add(c);const n=hash(c*41+3)<0.6?1+Math.floor(hash(c*41+4)*2):0;for(let i=0;i<n;i++){const x=c*300+hash(c*41+5+i)*300;if(x>WALLX+20)crabs.push({c,g:hash(c*41+9+i)<0.065,x,dir:hash(c*7+i)<0.5?-1:1,tt:2+hash(c*9+i)*4,walk:true,hideT:-9,ph:hash(c*3+i)*4});}}
+  for(let c=c0;c<=c1;c++){if(crabC.has(c))continue;crabC.add(c);const n=hash(c*41+3)<0.6?1+Math.floor(hash(c*41+4)*2):0;for(let i=0;i<n;i++){const x=c*300+hash(c*41+5+i)*300;if(x>WALLX+20&&tropLook(x)<0.72)crabs.push({c,g:hash(c*41+9+i)<0.065,x,dir:hash(c*7+i)<0.5?-1:1,tt:2+hash(c*9+i)*4,walk:true,hideT:-9,ph:hash(c*3+i)*4});}}
   for(let i=crabs.length-1;i>=0;i--){const k=crabs[i];if(k.x<cx-700||k.x>cx+W+700){crabC.delete(k.c);crabs.splice(i,1);continue;}
     const near=DV.on&&Math.hypot(DV.x-k.x,DV.y-(floorY(k.x)-5))<(k.g?55:40);if(near)k.hideT=T+2.5;
     if(T<k.hideT)continue;k.tt-=dt;if(k.tt<=0){k.walk=Math.random()<0.7;if(Math.random()<0.4)k.dir=-k.dir;k.tt=2+Math.random()*4;}
@@ -593,24 +621,171 @@ function drawBoatMarker(T){if(!DV.on)return;let bx=B.x-cx,by=B.y-cy-14;const on=
   if(on){my-=4;}const ca=Math.cos(ang),sa=Math.sin(ang),inA=(x,y)=>{const u=x*ca+y*sa,v=-x*sa+y*ca;return (u>=0&&u<=6&&Math.abs(v)<=(6-u)*0.62+0.3)||(u>=-5&&u<0&&Math.abs(v)<=1.1);};
   for(let y=-8;y<=8;y++)for(let x=-8;x<=8;x++){if(inA(x,y))px(mx+x,my+y,RED);else if(inA(x+1,y)||inA(x-1,y)||inA(x,y+1)||inA(x,y-1))px(mx+x,my+y,DK);}
   if(!on){const s=Math.round(Math.hypot(B.x-DV.x,B.y-DV.y)/10)+"M",tx=Math.max(2,Math.min(W-s.length*4-2,mx-s.length*2)),ty=my+(my>H/2?-12:7);for(let y=ty-1;y<ty+6;y++)for(let x=tx-1;x<tx+s.length*4;x++)put(x,y,0);text(s,tx,ty,10);}}
-let last=performance.now(),T=0;loadDeck();
+
+// ---- day / night + tropical reef (one block, so rod and jelly edits stay clear of it)
+function lerpU(a,b,t){t=t<0?0:t>1?1:t;const ch=s=>((a>>s)&255)+((((b>>s)&255)-((a>>s)&255))*t);return 0xff000000|((ch(16)|0)<<16)|((ch(8)|0)<<8)|(ch(0)|0);}
+function seaPixel(wx,wy,surf,T){
+  const day=DAYK,b=bay(wx,wy),depth=wy-surf;
+  if(depth<-1){
+    const tt=Math.min(1,(-depth)/110);
+    const night=lerpU(0xff402412,0xff0c0604,tt),noon=lerpU(0xfff0dca8,0xffb07028,tt);
+    let col=lerpU(night,noon,day);
+    if(b>0.78)col=lerpU(col,day>0.5?0xffb07028:0xff0c0604,0.45);
+    if(day<0.48){
+      const h=hash2((wx|0)*3+1,((wy+420)|0)*5+2);
+      if(h>0.99815){const twk=0.35+0.65*Math.abs(Math.sin(T*(1.4+h*3)+h*40));const vis=((0.48-day)/0.48)*twk;if(vis>0.18)col=lerpU(col,h>0.99925?0xffffffff:0xfff0e8d8,Math.min(1,vis));}
+    }
+    return col;
+  }
+  if(depth<1.4)return lerpU(P32[6],P32[day>0.5?5:2],day<0.35?0.45:0.15);
+  let idx=waterIdx(wx,wy);
+  const upper=Math.max(0,1-depth/360);
+  if(day>0.12&&upper>0.04){const lift=day*upper;if(b<lift*0.95&&idx<5)idx++;if(b<lift*0.42&&idx<5&&depth<160)idx++;}
+  const nightAmt=(1-day)*Math.max(0,1-depth/480);
+  if(nightAmt>0.18&&b<nightAmt&&idx>0)idx--;
+  if(nightAmt>0.5&&b<nightAmt*0.55&&idx>1&&depth<240)idx--;
+  let col=P32[idx];
+  if(depth<6&&b<0.32)col=P32[6];
+  const tw=tropLook(wx);
+  if(tw>0){
+    const sh=Math.max(0,1-depth/240);
+    const tgt=sh>0.62?0xfff4e87a:sh>0.28?0xffe2c438:0xffb89820;
+    col=lerpU(col,tgt,tw*(0.7+0.3*sh)*(0.55+0.45*Math.max(day,0.3)));
+  }
+  if(day>0.1&&depth>3&&depth<420){
+    const ang=wx*0.62+depth*0.78,cell=Math.floor(ang/86),r=hash(cell*17+5);
+    if(r<0.74){
+      const center=cell*86+16+r*48,width=8+depth*0.028,u=(ang-center)/width;
+      let I=Math.exp(-u*u*0.35)*(1-depth/460)*(0.62+0.38*Math.sin(T*0.32+r*18))*day;
+      if(tw>0.4)I*=1.15;
+      if(I>0.06&&b<Math.min(0.98,I*1.2))col=lerpU(col,0xfff8ffe8,Math.min(0.88,0.34+I*0.75));
+    }
+  }
+  return col;
+}
+function paintSkyBodies(T){
+  const ox=Math.floor(cx),oy=Math.floor(cy),day=DAYK;
+  function disc(sx,sy,rad,col,glow,bite){
+    const R=Math.ceil(rad+2);
+    for(let y=-R;y<=R;y++)for(let x=-R;x<=R;x++){
+      if(bite&&(x+bite[0])*(x+bite[0])+(y+bite[1])*(y+bite[1])<bite[2]*bite[2])continue;
+      const d=Math.hypot(x,y);if(d>rad+1.5)continue;
+      const px=sx+x,py=sy+y;if(px<0||px>=W||py<0||py>=H)continue;
+      if(py+oy>surfY(px+ox,T)-1)continue;
+      const i=py*W+px;
+      if(d<=rad-0.3)buf[i]=col;else buf[i]=lerpU(buf[i],glow,1-(d-(rad-0.3))/1.8);
+    }
+  }
+  if(day>0.06){const sx=Math.floor(W*(0.18+(1-day)*0.16)),sy=Math.floor(8+(1-day)*26);disc(sx,sy,3.4+day*1.5,0xff6ed6ff,0xfff0e8b0,null);}
+  if(day<0.78){const sx=Math.floor(W*0.78),sy=Math.floor(11+day*20);disc(sx,sy,3.5,0xfff4f0e6,0xffe0d8c8,[1.5,-0.3,2.5]);}
+}
+function sandPix(wx,wy,d){
+  const n=vn2(wx/18,wy/9,11),b=bay(wx,wy),rip=0.5+0.5*Math.sin(wx*0.16+wy*0.05);
+  let col=n>0.66?0xffd2edf8:n>0.4?0xffb4e4f2:0xff8ecae4;
+  if(d<2)col=0xffd8f0fa;
+  if(d>8&&b<0.45)col=0xff6aa8c8;
+  if(rip>0.86&&b<0.35&&d<5)col=0xffeef6fc;
+  return col;
+}
+const CORAL_NAMES=["fan_orange","gorgonian_red","staghorn_purple","plate_brain","branch_blue","birdsnest_pink","carnation_pink","double_purple","pillar_pink"];
+const coralImg={};let coralReady=0;
+function loadCorals(){
+  for(const n of CORAL_NAMES)for(const dead of [0,1]){
+    const key=n+(dead?"_dead":"");
+    const im=new Image();
+    im.onload=()=>{try{
+      coralImg[key]=[0.36,0.46,0.56].map(sc=>{
+        const w=Math.max(12,Math.round(im.width*sc)),h=Math.max(12,Math.round(im.height*sc));
+        const c=document.createElement("canvas");c.width=w;c.height=h;
+        const g=c.getContext("2d",{willReadFrequently:true});g.imageSmoothingEnabled=false;g.drawImage(im,0,0,w,h);
+        return {w:w,h:h,d:g.getImageData(0,0,w,h).data};
+      });
+      coralReady++;
+    }catch(err){coralImg[key]=null;}};
+    im.src="sprites/coral/"+key+".png";
+  }
+}
+loadCorals();
+function blitCoral(im,wx,floor,Tm){
+  const x0=Math.round(wx-cx-im.w/2+Math.sin(Tm*0.55+wx)*0.8),y0=Math.round(floor-cy-im.h+1),dim=0.48+0.52*DAYK,tw=tropLook(wx);
+  for(let y=0;y<im.h;y++){const py=y0+y;if(py<0||py>=H)continue;const wy=py+cy,surf=surfY(pxWorld(x0,py),Tm);
+    for(let x=0;x<im.w;x++){const px=x0+x;if(px<0||px>=W)continue;const i=(y*im.w+x)*4;if(im.d[i+3]<40)continue;
+      let r=im.d[i]*dim,g=im.d[i+1]*dim,bb=im.d[i+2]*dim;
+      if(wy>surf){const f=Math.min(0.22,0.05+(wy-surf)/600)*(1-tw*0.65);r=r*(1-f)+50*f;g=g*(1-f)+190*f;bb=bb*(1-f)+200*f;}
+      buf[py*W+px]=0xff000000|((bb|0)<<16)|((g|0)<<8)|(r|0);
+    }
+  }
+}
+function pxWorld(x0,py){return x0+cx;}
+function coralStub(wx,floor,kind,sc){
+  const cols=[[230,120,40],[200,50,60],[150,70,180],[80,140,200],[220,90,140],[180,70,160],[120,70,190],[210,100,150],[230,110,160]];
+  const col=cols[kind%cols.length],h=Math.round(18+sc*16),w=Math.round(14+sc*14);
+  const x0=Math.round(wx-cx),y0=Math.round(floor-cy);
+  for(let y=0;y<h;y++)for(let x=-w;x<=w;x++){
+    const u=y/h,wide=(1-u)*(0.35+0.65*Math.abs(Math.sin(kind+u*6)));
+    if(Math.abs(x)>w*wide)continue;
+    const px=x0+x,py=y0-y;if(px<0||px>=W||py<0||py>=H)continue;
+    const sh=x<0?0.75:1,rr=(col[0]*sh)|0,gg=(col[1]*sh)|0,bb=(col[2]*sh)|0;
+    buf[py*W+px]=0xff000000|(bb<<16)|(gg<<8)|rr;
+  }
+}
+function drawCorals(Tm){
+  const ch0=Math.floor((cx-48)/58),ch1=Math.floor((cx+W+48)/58);
+  for(let ch=ch0;ch<=ch1;ch++){
+    if(hash(ch*91+3)>0.16){
+      const n=1+(hash(ch*91+4)>0.42?1:0)+(hash(ch*91+8)>0.72?1:0);
+      for(let i=0;i<n;i++){
+        const s0=ch*47+i*19,x=ch*58+6+hash(s0)*46;
+        if(x<TROP0+24||x>TROP1-24||tropLook(x)<0.94)continue;
+        const kind=Math.floor(hash(s0+2)*CORAL_NAMES.length),dead=hash(s0+3)<0.2,sc=hash(s0+4)<0.34?0:hash(s0+4)<0.72?1:2;
+        const key=CORAL_NAMES[kind]+(dead?"_dead":""),pack=coralImg[key],fy=floorY(x);
+        if(pack&&pack[sc])blitCoral(pack[sc],x,fy,Tm);
+        else if(!pack)coralStub(x,fy,kind,sc);
+      }
+    }
+  }
+}
+const NEMO={pal:["#160e0c","#ec6612","#ffa834","#b03e10","#f6f7f0","#0e1018","#fffbee","#120c0a","#ffe6a0"],frames:[["...........00...........",".........005400.........",".......005254520........",".....005452545250...000.","....02254525452540002220","...087654515451540221100","...0776545154515421110..","...066654515451540221100","....01124515451540002220",".....005123545350...000.",".......005354500........",".........00000..........","........................"],["...........00...........",".........005400.........",".......005254520....000.",".....005452545250.002220","....02254525452540221100","...0876545154515421110..","...077654515451540221100","...066654515451545002220","....01124515451540..000.",".....005123545350.......",".......005354500........",".........00000..........","........................"],["...........00...........",".........005400.........",".......005254520........",".....005452545250.......","....02254525452540..000.","...087654515451545002220","...077654515451540221100","...0666545154515421110..","....01124515451540221100",".....005123545350.002220",".......005354500....000.",".........00000..........","........................"],["...........00...........",".........005400.........",".......005254520........",".....005452545250...000.","....02254525452540002220","...087654515451540221100","...0776545154515421110..","...066654515451540221100","....01124515451540002220",".....005123545350...000.",".......005354500........",".........00000..........","........................"]]};
+const PUFFER={pal:["#2a2012","#d6b86c","#f2dc9c","#9c7c46","#5a4626","#ffec96","#161008","#ece4cc","#be9e5a","#f8e8ba"],frames:[["..........0..0............",".......0..0..0..0.........","....0..0..0000..0.........","....0..0..0220.0...0......",".....0.000222200..0.......","..00..02222224220.........",".....0225422222220...00...","....02226522222422000880..","....01566651114111088880..","....01156511111111888880..","....00015111411111088880..",".00.09099999999999000880..",".....0999999999990...00...","...00.09999999990.0.......","..0....000999000...0......",".....00...090...0..0......","....0...0..0.0..00........",".......00..0..0..........."],["......0...0..0............",".......0..0..0...0........","...0...0..0000..0.........","....00..0082280.0..0......",".0....00222222200.0.......","..00.0222222242220........","....022254222222220..00...","...022226522222422200880..","...011566651114111088880..","...011156511111111888880..","...010015111411111088880..",".00099099999999999900880..","0...099999999999990..00...","...0.0999999999990........","..0...00999999900.00......",".....0..0009000.0...0.....","....00..0..0..0..0........",".......0...0..0..0........"],["..........0..0............",".......0..0..0..0.........","....0..0..0000..0.........",".....0..0.0..0.0...0......",".....0.020200200.00.......","..00..02222224220.........","....00225422222220........","....022265222224220..00...","....01566651114111100880..","....01156511111111088880..","....00015111411111888880..",".00009099999999999088880..",".....0999999999990.00880..","...00.09999999990.0..00...","..0...0090000000...0......",".....0..0.......0.........",".....0..0..0.0...0........",".......0...0..0..........."],["..........0..0............",".......0..0..0..0.........","....0..0..0000..0.........","....0....08220..0..0......","..0..0.002222200..0.......","..00.0022222242200...00...","....02225422222222000880..","....02226522222422088880..","....01566651114111888880..","...011156511111111088880..","....00015111411111100880..",".00.090999999999990..00...","....099999999999990.......","....000999999999000.......","..00...009999900...0......",".....0...00900..0...0.....","....0...0..0.0...0........",".......00..0..0..........."]]};
+const NEMOC=pc(NEMO),PUFFC=pc(PUFFER);
+function reefFrame(e,Tm){
+  if(e.k==="puffer"){const puff=e.puff==null?1:e.puff,wag=(Math.floor(Tm*2.2+(e.ph||0))&1);return puff>0.62?(wag?1:3):(wag?0:2);}
+  return ((Math.floor(Tm*6+(e.ph||0))%4)+4)%4;
+}
+function spawnReefFish(c,x0){
+  const fl=floorY(x0),sf=12,span=Math.max(18,fl-sf-18),n=3+Math.floor(hash(c*13+1)*2);
+  for(let i=0;i<n;i++)solo.push({k:"nemo",c,x:x0-160+hash(c*17+i)*320,y:sf+8+hash(c*19+i)*span,vx:hash(c*23+i)<0.5?-14:14,vy:0,ph:hash(c*29+i)*4,tx:x0,ty:sf+24,tt:0.3+hash(c*31+i),face:hash(c*23+i)<0.5?-1:1});
+  if(hash(c*71+5)<0.95)solo.push({k:"puffer",c,x:x0-60+hash(c*73)*180,y:sf+14+hash(c*79)*span*0.7,vx:4,vy:0,ph:hash(c*83)*4,tx:x0,ty:sf+30,tt:1.2,puff:1,face:1});
+}
+function stepReefFish(e,dt,Tm){
+  e.tt-=dt;const sf=surfY(e.x,Tm)+10,fl=floorY(e.x)-(e.k==="puffer"?18:12);
+  if(e.tt<=0||Math.hypot((e.tx||0)-e.x,(e.ty||0)-e.y)<9){
+    const reach=e.k==="puffer"?90:150;
+    e.tx=Math.max(TROP0+36,Math.min(TROP1-36,e.x+(Math.random()-0.5)*reach*2));
+    e.ty=sf+Math.random()*Math.max(12,fl-sf);
+    e.tt=(e.k==="puffer"?2.4:1.2)+Math.random()*2.8;
+  }
+  steer(e,e.tx,e.ty,e.k==="puffer"?9:18,dt,e.k==="puffer"?0.8:1.6);
+  if(e.k==="puffer"){
+    const hero=DV.on?DV:B,dx=e.x-hero.x,dy=e.y-hero.y,d=Math.hypot(dx,dy)||1,near=d<46;
+    e.puff=Math.max(0.4,Math.min(1,(e.puff==null?1:e.puff)+(near?2.4:-0.7)*dt));
+    if(near){e.vx+=dx/d*26*dt;e.vy+=dy/d*14*dt;}
+  }
+  if(e.y<sf)e.vy+=40*dt;if(e.y>fl)e.vy-=48*dt;
+  if(e.x<TROP0+28)e.vx+=30*dt;if(e.x>TROP1-28)e.vx-=30*dt;
+  const mx=e.k==="puffer"?15:30,sp=Math.hypot(e.vx,e.vy);if(sp>mx){e.vx*=mx/sp;e.vy*=mx/sp;}
+  e.x+=e.vx*dt;e.y+=e.vy*dt;if(Math.abs(e.vx)>0.3)e.face=e.vx>0?1:-1;
+}
+
+let last=performance.now(),T=DAY_CYCLE*0.45;loadDeck();
 let frameErr=0;function frame(now){try{frame0(now);}catch(e){if(!frameErr){frameErr=1;console.warn('frame error (logged once):',e);}last=now;}requestAnimationFrame(frame);}
 function frame0(now){const dt=Math.min(0.05,(now-last)/1000);last=now;T+=dt;
-  physics(dt,T);updTurn(dt);updFish(dt,T);updSchools(dt,T);updSea(dt,T);updCrabs(dt,T);updCages(dt,T);updJelly(dt,T);updFreeKing(dt,T);updBoss(dt,T);updDiver(dt,T);updFeed(dt,T);
+  physics(dt,T);if(HOLD){B.x=HOLD.x;B.y=HOLD.y;B.vx=B.vy=0;}updTurn(dt);updFish(dt,T);updSchools(dt,T);updSea(dt,T);updCrabs(dt,T);updCages(dt,T);updJelly(dt,T);updFreeKing(dt,T);updBoss(dt,T);updDiver(dt,T);updFeed(dt,T);
   const ox=Math.floor(cx),oy=Math.floor(cy);
-  // water + sky + surface
-  for(let sx=0;sx<W;sx++){const wx=ox+sx;const surf=surfY(wx,T);
-    for(let sy=0;sy<H;sy++){const wy=oy+sy;let c;
-      if(wy<surf-1){const tt=Math.min(1,(surf-wy)/90);c=(tt>bay(wx,wy)*0.9+0.1)?3:4;}
-      else if(wy<surf+1)c=6;
-      else{c=waterIdx(wx,wy);
-        if(wy<surf+5&&bay(wx,wy)<0.35)c=6;
-        // god rays (world anchored, slow shimmer)
-        if(wy<560){const pc=Math.floor((wx+wy*0.45)/110);const r=hash(pc*13+3);if(r<0.7){
-          const cxr=pc*110+20+r*70,u=(wx+wy*0.45-cxr)/(6+wy*0.03)/(1+0.15*Math.sin(T*0.3+r*9));
-          const I=Math.exp(-u*u)*(1-wy/560)*(0.6+0.4*Math.sin(T*0.25+r*20));
-          if(bay(wx,wy)<I*0.85)c=Math.min(c+1,5)===c&&c==5?6:(c<5?c+1:c);}}}
-      buf[sy*W+sx]=P32[c];}}
+  // water + sky + surface. Day, night, and the lagoon tint live in seaPixel.
+  DAYK=dayK(T);
+  for(let sx=0;sx<W;sx++){const wx=ox+sx,surf=surfY(wx,T);for(let sy=0;sy<H;sy++)buf[sy*W+sx]=seaPixel(wx,oy+sy,surf,T);}
+  paintSkyBodies(T);
   // far floor ridge (parallax 0.6)
   for(let sx=0;sx<W;sx++){const fx=sx+cx*0.6;const fy=farFloorY(fx);for(let sy=Math.max(0,Math.floor(fy-cy));sy<H;sy++)buf[sy*W+sx]=P32[1];}
   for(const s of kelpStalks(0,cx*0.6-40,cx*0.6+W+40))drawKelp(s,T,0.6,false);
@@ -622,20 +797,21 @@ function frame0(now){const dt=Math.min(0.05,(now-last)/1000);last=now;T+=dt;
   // floor + rocks
   for(let sx=0;sx<W;sx++){const wx=ox+sx,fy=floorY(wx);
     const nr=nearRav(wx);for(let sy=Math.max(0,Math.floor(fy-oy));sy<H;sy++){const wy=oy+sy,d=wy-fy;if(nr){const rc=ravPix(wx,wy,fy);if(rc>=0){buf[sy*W+sx]=P32[rc];continue;}}
+      if(tropLook(wx)>0.42){buf[sy*W+sx]=sandPix(wx,wy,d);continue;}
       const n=vn2(wx/10,wy/7,3)*0.7+vn2(wx/4,wy/3,9)*0.3;
       const sand=Math.max(0,1-d/7)+ (n>0.66?0.35:0);
       buf[sy*W+sx]=P32[sand>bay(wx,wy)?9:(n<0.3&&bay(wx,wy)<0.4?0:8)];}}
   for(let rc=Math.floor(cx/45)-1;rc<=Math.floor((cx+W)/45)+1;rc++){const h=hash(rc*17+5);if(h>0.55)continue;
-    const rx=rc*45+hash(rc*17+6)*45,r=3+hash(rc*17+7)*9,ry=floorY(rx)+r*0.35;if(rx>crkL(ry)-r*1.3-6&&rx<crkR(ry)+r*1.3+6)continue;
+    const rx=rc*45+hash(rc*17+6)*45,r=3+hash(rc*17+7)*9,ry=floorY(rx)+r*0.35;if(tropLook(rx)>0.55)continue;if(rx>crkL(ry)-r*1.3-6&&rx<crkR(ry)+r*1.3+6)continue;
     for(let y=-r;y<=r*0.4;y++)for(let x=-r*1.3;x<=r*1.3;x++){if((x/1.3)**2+y*y>r*r)continue;const X=Math.round(rx+x-cx),Y=Math.round(ry+y-cy);
       const lit=(-x-y)/(r*1.6)+0.3;const edge=(x/1.3)**2+y*y>(r-1.2)*(r-1.2);put(X,Y,edge&&(x>0||y>0)?0:(lit>bay(X+ox,Y+oy)+0.25?9:(lit<-0.2&&bay(X,Y)<0.6?0:8)));}}
   for(const s of kelpStalks(1,cx-40,cx+W+40))drawKelp(s,T,1,true);
-  drawRavLip(T,ox,oy);
+  drawCorals(T);drawRavLip(T,ox,oy);
   drawCages(T);drawCrabs(T);drawCliff(T);const sqb=drawSquid(T);drawSchools(T);drawSea(T);drawJelly(T);drawFreeKing(T);drawBoss(T);drawParts();drawBoat();drawDiver(T);drawFeed(T);drawPrompt(T,sqb-SQWL*(1+0.1*pulse)-2);drawBubble(T,sqb-SQWL*(1+0.1*pulse)-2);drawDark(T);drawBossGlow(T);drawBoatMarker(T);
   nearSquid=!DV.on&&Math.abs(B.x-SQX)<130&&B.y<40;
   // depth meter
   const dd=DV.on?DV.y-surfY(DV.x,T):B.y-surfY(B.x,T);const dep=Math.max(0,Math.round(dd/10));
-  const l1=B.air?"AIR "+Math.round(-dd/10)+"M":"DEPTH "+dep+"M",l2="SPD "+Math.round(B.spd/5);
+  const l1=B.air?"AIR "+Math.round(-dd/10)+"M":"DEPTH "+dep+"M",l2="SPD "+Math.round(B.spd/5)+(DAYK>0.7?" DAY":DAYK<0.25?" NIGHT":" DUSK")+(tropLook(DV.on?DV.x:B.x)>0.7?" REEF":"");
   for(let y=3;y<18;y++)for(let x=3;x<7+4*Math.max(l1.length,l2.length);x++)put(x,y,0);
   text(l1,5,5,6);text(l2,5,11,5);
   if(!talk.on&&!(document.fullscreenElement||document.webkitFullscreenElement)){const h="PRESS F FOR FULLSCREEN";const hx=Math.floor(W/2-h.length*2);for(let y=H-11;y<H-3;y++)for(let x=hx-2;x<hx+h.length*4+1;x++)put(x,y,0);text(h,hx,H-9,(T%2<1.4)?10:6);}
@@ -664,7 +840,7 @@ function cageKey(T){if(talk.on)return;
   if(CC.key===1&&!DV.on){CC.key=2;CC.stock=CAGE_MAX;STORE.set('deepsea_cagekey',2);cageMsg(CAGE_KEY_NAME+' USED: 5 CAGES!',T);playDrop(1.2,0.5);return;}
   if(CC.key!==2)return;if(CC.list.length>=CAGE_MAX){cageMsg('MAX 5 CAGES PLACED',T,2);return;}if(CC.stock<=0){cageMsg('NO CAGES LEFT',T,2);return;}
   const x=DV.on?DV.x:B.x+B.face*14,y=DV.on?DV.y+4:Math.max(B.y,surfY(B.x,T)+2);CC.stock--;CC.list.push({x,y,vx:DV.on?DV.vx*0.3||0:B.vx*0.2,vy:0,lvl:0,on:false,next:0});splash(x,surfY(x,T),DV.on?0:8,0.4);playDrop(0.8,0.5);}
-const DROP_NAME={sard:'SARDINE',tuna:'TUNA',mako:'SHARK',crab:'HERMIT CRAB',gcrab:'GIANT CRAB',mcrab:'MUD CRAB',jelly:'JELLY',king:'KING JELLY',cage:'CRAB CAGE'};
+const DROP_NAME={sard:'SARDINE',tuna:'TUNA',mako:'SHARK',crab:'HERMIT CRAB',gcrab:'GIANT CRAB',mcrab:'MUD CRAB',jelly:'JELLY',king:'KING JELLY',cage:'CRAB CAGE',nemo:'CLOWNFISH',puffer:'PUFFER'};
 function dropOldest(T){const f=DV.carry.shift();if(!f)return;const x=f.lx||DV.x,y=f.ly||DV.y+6;
   if(f.k==='cage'){CC.list.push({x,y,vx:0,vy:8,lvl:f.lvl|0,on:false,next:0});cageMsg('DROPPED CRAB CAGE',T,2);}
   else{releaseFish(f,x,y);cageMsg('DROPPED '+(DROP_NAME[f.k]||f.k.toUpperCase()),T,2);}
@@ -836,7 +1012,7 @@ function drawHearts(T){const HP=[".11.11.","1111111","1111111",".11111.","..111.
 // ---- king jelly carcass (on spear/rope): 4 rope knots around the bell + limp trailing tentacles
 
 // ---- rope/spear cargo collision: solid bodies vs soft jelly cores
-const CHIT={sard:[3,0],tuna:[6,0],mako:[9,0],crab:[4,0],gcrab:[10,0],mcrab:[3,0],cage:[8,0],jelly:[2,5],king:[8,18]};
+const CHIT={sard:[3,0],tuna:[6,0],mako:[9,0],crab:[4,0],gcrab:[10,0],mcrab:[3,0],cage:[8,0],jelly:[2,5],king:[8,18],nemo:[4,0],puffer:[6,1]};
 function pushPt(p,r){if(r<=0)return;let x=p.x,y=p.y;
   if(!isOpen(x,y)){let bd=1e9,bx=x,by=y;for(let a=0;a<16;a++){const th=a*Math.PI/8;for(let d=1;d<=28;d+=1){const nx=x+Math.cos(th)*d,ny=y+Math.sin(th)*d;if(isOpen(nx,ny)){if(d<bd){bd=d;bx=nx;by=ny;}break;}}}x=bx;y=by;}
   let fx=0,fy=0;for(let a=0;a<12;a++){const th=a*Math.PI/6;if(!isOpen(x+Math.cos(th)*r,y+Math.sin(th)*r)){fx-=Math.cos(th);fy-=Math.sin(th);}}
@@ -863,7 +1039,7 @@ function drawJellyCargo(wx,wy,ang,T,f){const amt=(f&&f.sq)||0;drawSquish(JL.fram
 
 // ---- jelly vs fish + dead-king carcass stings (0 dmg to player)
 function jellyHurtFish(x,y,r,T){for(const [,s] of schools)for(let i=s.fish.length-1;i>=0;i--){const f=s.fish[i];if(Math.hypot(f.x-x,f.y-y)<r){s.fish.splice(i,1);bleed(f.x,f.y,4);for(let k=0;k<2;k++)bones.push({x:f.x+(k-0.5)*3,y:f.y,kind:k,vx:(Math.random()-0.5)*4,l:0,rest:false});}}
-  for(let i=solo.length-1;i>=0;i--){const e=solo[i];if(e.onHook||(e.jcd||0)>T)continue;const hitR=e.k==='tuna'?10:14;if(Math.hypot(e.x-x,e.y-y)>hitR+r)continue;e.jcd=T+0.85;if(e.hp===undefined)e.hp=e.k==='tuna'?2:3;e.maxhp=e.k==='tuna'?2:3;e.hp--;e.hpShow=T+2.5;e.flash=T+0.12;bleed(e.x,e.y,3);
+  for(let i=solo.length-1;i>=0;i--){const e=solo[i];if(e.onHook||(e.jcd||0)>T)continue;const hitR=e.k==='nemo'?12:e.k==='puffer'?16:e.k==='tuna'?10:14;if(Math.hypot(e.x-x,e.y-y)>hitR+r)continue;e.jcd=T+0.85;if(e.hp===undefined)e.hp=e.k==='mako'?3:e.k==='tuna'?2:1;e.maxhp=e.k==='mako'?3:e.k==='tuna'?2:1;e.hp--;e.hpShow=T+2.5;e.flash=T+0.12;bleed(e.x,e.y,3);
     if(e.hp<=0){solo.splice(i,1);for(const s of solo)if(s.chase===e)s.chase=null;for(let k=0;k<3;k++)bones.push({x:e.x+(k-1)*4,y:e.y,kind:k,vx:(Math.random()-0.5)*6,l:0,rest:false});bleed(e.x,e.y,8);}}}
 function kingTentTips(wx,wy,ang,T,f){const c=Math.cos(ang),s=Math.sin(ang),pts=[];for(let k=0;k<5;k++){let u=-16+k*8,v=8;for(let i=0;i<22;i++){u+=Math.sin(T*1.2+k+i*0.3)*0.25+0.35;v+=1.6;if(i===10||i===21)pts.push([wx+c*u-s*v,wy+s*u+c*v]);}}return pts;}
 function jellyCargoFx(T){if(!DV.on)return;
@@ -880,5 +1056,7 @@ function drawKing(wx,wy,ang,T,f){const amt=(f&&f.sq)||0,qx=(f&&f.sqx)||0,qy=(f&&
       u+=Math.sin(T*1.2+k+i*0.3)*0.25+0.35;v+=1.6;}}
   drawSoftSprite(f.soft,GJS.frames[0],GJC,T,false);}
 window.__dive={gjReset,bossHit,freeKing,dropOldest,makeSoft,updSoft,softSnap,softCOM,drawSoftSprite,drawTents,jellyHurtFish,CHIT,pushPt,rimFeel,cargoSquish,hasKing,GJ,PHP,killDiver,bossHit,sting,RAV:{RVX,CAVY,CAVRY,isOpen,floorAt,crkC,crkL,crkR,lights,lightAt,darkAt},jel,CC,crabs,hookAt(k){const e={k,c:-999,x:fish.x+(k==='tuna'?16:28),y:fish.y,vx:-0.01,vy:0,ph:0,face:-1,tx:fish.x,ty:fish.y,tt:99,cool:99};solo.push(e);},DV,SPR,carryW,FEED,get score(){return score},get best(){return best},deck,mouse,get W(){return W},addFish(k,x,y){if(k==='sard'){const c=Math.floor(x/500);let s=schools.get(c);if(!s){s={c,fish:[],tx:x,ty:y,seed:0};schools.set(c,s);}if(s.seed===undefined){s.tx=x;s.ty=y;s.seed=0;}s.fish.push({x,y,vx:0.01,vy:0,ph:0});}else solo.push({k,c:-999,x,y,vx:-0.01,vy:0,ph:0,tx:x,ty:y,tt:99,cool:99});}};
-window.__game={get cam(){return{cx,cy}},get boat(){return{x:B.x,y:B.y,vx:B.vx,vy:B.vy,ang:B.ang,air:B.air,lvx:B.lvx,talk:talk.on,line:talk.line,n:talk.n,near:nearSquid,sea:{tuna:solo.filter(e=>e.k==='tuna').length,shark:solo.filter(e=>e.k==='mako').length,chasing:solo.some(e=>e.chase),held:solo.some(e=>e.held),blood:blood.length,bones:bones.length,bonesRest:bones.filter(b=>b.rest).length},caught:!!fish.caught,nfish:[...schools.values()].reduce((a,s)=>a+s.fish.length,0),fish:{st:fish.st,x:fish.x,y:fish.y,hvx:fish.hvx||0,hvy:fish.hvy||0,rod:rodW(),load:(fish.load||[]).map(f=>f.k||'sard'),stick:fish.stick&&fish.stick.onHook?{k:fish.stick.k,hp:fish.stick.hp,max:fish.stick.maxhp}:null},vp,face:B.face,wall:WALLX,po:B.po,pulse,pupil:{x:pupil.x,y:pupil.y},surf:surfY(B.x,T),splashT,airT,T}},set(x,y){B.x=x;B.y=y;B.vx=B.vy=0;cx=x-W/2;cy=y-H/2;}};
+window.__game={get cam(){return{cx,cy}},get boat(){return{x:B.x,y:B.y,vx:B.vx,vy:B.vy,ang:B.ang,air:B.air,lvx:B.lvx,talk:talk.on,line:talk.line,n:talk.n,near:nearSquid,sea:{tuna:solo.filter(e=>e.k==='tuna').length,shark:solo.filter(e=>e.k==='mako').length,chasing:solo.some(e=>e.chase),held:solo.some(e=>e.held),blood:blood.length,bones:bones.length,bonesRest:bones.filter(b=>b.rest).length},caught:!!fish.caught,nfish:[...schools.values()].reduce((a,s)=>a+s.fish.length,0),fish:{st:fish.st,x:fish.x,y:fish.y,hvx:fish.hvx||0,hvy:fish.hvy||0,rod:rodW(),load:(fish.load||[]).map(f=>f.k||'sard'),stick:fish.stick&&fish.stick.onHook?{k:fish.stick.k,hp:fish.stick.hp,max:fish.stick.maxhp}:null},vp,face:B.face,wall:WALLX,po:B.po,pulse,pupil:{x:pupil.x,y:pupil.y},surf:surfY(B.x,T),splashT,airT,T}},set(x,y){B.x=x;B.y=y;B.vx=B.vy=0;cx=x-W/2;cy=y-H/2;},setTod(p){T=((p%1)+1)%1*DAY_CYCLE;DAYK=dayK(T);},get day(){return DAYK;},get reef(){return tropLook(DV.on?DV.x:B.x);},reefFish(){return {nemo:solo.filter(e=>e.k==='nemo').length,puffer:solo.filter(e=>e.k==='puffer').length};},get corals(){return coralReady;},get fishReady(){return reefReady;}};
+try{const q=new URLSearchParams(location.search);if(q.has("tod")){const p=+q.get("tod");if(!isNaN(p))T=((p%1)+1)%1*DAY_CYCLE;}if(q.has("x")){const x=+q.get("x"),y=q.has("y")?+q.get("y"):B.y;if(!isNaN(x)){B.x=x;B.y=isNaN(y)?B.y:y;B.vx=B.vy=0;cx=x-W/2;cy=(isNaN(y)?B.y:y)-H/2;}}if(q.get("hold")==="1")HOLD={x:B.x,y:B.y};}catch(e){}
+addEventListener("keydown",e=>{if(e.repeat)return;if(e.code==="BracketRight")T+=DAY_CYCLE*0.25;if(e.code==="BracketLeft")T-=DAY_CYCLE*0.25;});
 </script></body></html>
