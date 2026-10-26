@@ -29,8 +29,8 @@ function tropShelfT(x){return tropLook(x);}
 function tropFloor(x){return 850+Math.sin(x*0.0034)*16+Math.sin(x*0.0105)*8+(fbm(x+500,4)-0.5)*24;}
 function floorY(x){const deep=WD-110+fbm(x,1)*90,shelf=tropFloor(x),t=tropShelfT(x);if(t<=0)return deep;if(t>=1)return shelf;return deep+(shelf-deep)*t;}
 // Reef blit scales are 1/3 of the previous swim/carry/deck/feed sizes. Hit radii stay a bit above a pure third so the hook and spear still connect.
-// Dolphin swim is 0.36 of the 84×36 v2 sheet (~30×13). v1 was 72×34 at 0.42, so the longer snout does not grow the on-screen dolphin. Still larger than the shrunk clownfish (~12×7).
-const RFSC={swimN:0.25,swimP:0.207,carryN:0.183,carryP:0.167,deckN:0.12,deckP:0.107,feedN:0.16,feedP:0.14,swimD:0.36,carryD:0.26,deckD:0.14,feedD:0.22};
+// v3 lean sheet is 94×28. Swim scale 0.50 keeps the needle snout (~33×11 on screen). v2 at 0.36 of 84×36 was ~30×13 and read fat; this stays longer than the shrunk clownfish (~12×7) and thinner.
+const RFSC={swimN:0.25,swimP:0.207,carryN:0.183,carryP:0.167,deckN:0.12,deckP:0.107,feedN:0.16,feedP:0.14,swimD:0.50,carryD:0.36,deckD:0.19,feedD:0.31};
 function isReef(k){return k==="nemo"||k==="puffer"||k==="dolphin";}
 function reefSc(k,kind){return RFSC[kind+(k==="dolphin"?"D":k==="puffer"?"P":"N")];}
 function dayK(T){const p=((T%DAY_CYCLE)+DAY_CYCLE)%DAY_CYCLE/DAY_CYCLE,sm=smooth01;if(p<0.12)return 0;if(p<0.28)return sm((p-0.12)/0.16);if(p<0.72)return 1;if(p<0.88)return 1-sm((p-0.72)/0.16);return 0;}
@@ -151,7 +151,7 @@ function rodFullMsg(T){if(T<(fish.fullT||0))return;fish.fullT=T+1.2;cageMsg(rodW
 function releaseStick(){if(fish.stick){fish.stick.onHook=false;fish.stick=null;}}
 function clearCast(){releaseStick();fish.load.length=0;fish.caught=null;fish.tick=0;fish.hvx=0;fish.hvy=0;}
 function secureCatch(k,T){const item=k?{t:T,k}:{t:T};fish.load.push(item);fish.caught=item;fish.tug=1;}
-function mouthOx(e){if(!e||e.k==='jelly'||e.k==='king')return 0;const face=e.face||-1;if(e.k==='tuna')return face*16;if(e.k==='nemo')return face*5;if(e.k==='puffer')return face*4;if(e.k==='dolphin')return face*10;return face*28;}
+function mouthOx(e){if(!e||e.k==='jelly'||e.k==='king')return 0;const face=e.face||-1;if(e.k==='tuna')return face*16;if(e.k==='nemo')return face*5;if(e.k==='puffer')return face*4;if(e.k==='dolphin')return face*11;return face*28;}
 function soloMaxHp(k){return k==='dolphin'?4:k==='mako'?3:k==='tuna'?2:1;}
 function hookHasHp(e){return e.k==='tuna'||e.k==='mako'||e.k==='jelly'||e.k==='king'||e.k==='dolphin'||e.hp!==undefined||e.maxhp;}
 function hookHeld(e){return e&&e.onHook&&(solo.includes(e)||jel.includes(e)||e===GJ||freeKing.includes(e));}
@@ -280,7 +280,7 @@ const FLASHC=[[255,235,235],[255,235,235],[255,235,235],[255,235,235],[255,235,2
 const reefImg={swim:null,right:null,left:null,dswim:null,dright:null,dleft:null};let reefReady=0;
 function grabSheet(src,fw,cb){const im=new Image();im.onload=()=>{try{const n=Math.max(1,Math.round(im.width/fw)),frames=[];for(let f=0;f<n;f++){const c=document.createElement("canvas");c.width=fw;c.height=im.height;const g=c.getContext("2d",{willReadFrequently:true});g.imageSmoothingEnabled=false;g.drawImage(im,-f*fw,0);frames.push({w:fw,h:im.height,d:g.getImageData(0,0,fw,im.height).data});}cb(frames);reefReady++;}catch(err){cb(null);}};im.src=src;}
 // Drop a new PNG on these paths to reskin the dolphin. The swim strip is 4 frames, each fw pixels wide.
-const DOLPHIN_SPR={swim:"sprites/dolphin/dolphin_swim.png",right:"sprites/dolphin/dolphin.png",left:"sprites/dolphin/dolphin_left.png",fw:84};
+const DOLPHIN_SPR={swim:"sprites/dolphin/dolphin_swim.png",right:"sprites/dolphin/dolphin.png",left:"sprites/dolphin/dolphin_left.png",fw:94};
 function loadReefFish(){grabSheet("sprites/fish/clownfish_swim.png",48,fr=>{reefImg.swim=fr;});grabSheet("sprites/fish/puffer.png",56,fr=>{reefImg.right=fr&&fr[0];});grabSheet("sprites/fish/puffer_left.png",56,fr=>{reefImg.left=fr&&fr[0];});grabSheet(DOLPHIN_SPR.swim,DOLPHIN_SPR.fw,fr=>{reefImg.dswim=fr;});grabSheet(DOLPHIN_SPR.right,DOLPHIN_SPR.fw,fr=>{reefImg.dright=fr&&fr[0];});grabSheet(DOLPHIN_SPR.left,DOLPHIN_SPR.fw,fr=>{reefImg.dleft=fr&&fr[0];});}
 loadReefFish();
 function blitReef(im,sx,sy,mirror,ang,Tm,sc,flash,edgeFade){if(!im)return false;sc=sc||1;ang=ang||0;const w=im.w,h=im.h,c=Math.cos(ang),sn=Math.sin(ang),hw=w/2,hh=h/2,R=Math.ceil(Math.hypot(hw,hh)*sc)+1,dim=flash?1:(0.68+0.32*(typeof DAYK==="number"?DAYK:1)),fade=edgeFade?tropLook(sx+cx):1;
@@ -293,7 +293,7 @@ function reefFr(Tm,ph){return ((Math.floor((Tm||0)*7+(ph||0))%4)+4)%4;}
 function drawReefCarry(k,sx,sy,flip,ang,Tm,sc,ph){if(k==="nemo")return blitReef(reefImg.swim&&reefImg.swim[reefFr(Tm,ph)],sx,sy,!flip,ang,Tm,sc,false);if(k==="dolphin"){const fr=reefImg.dswim&&reefImg.dswim[reefFr(Tm,ph)];if(fr)return blitReef(fr,sx,sy,!flip,ang,Tm,sc,false);return blitReef(reefImg.dright,sx,sy,!flip,ang,Tm,sc,false);}return blitReef(reefImg.right,sx,sy,!flip,ang,Tm,sc,false);}
 function drawReefSwim(e,sx,sy,th,Tm){const face=e.face||(e.vx>=0?1:-1),flash=(e.flash||0)>Tm;if(e.k==="nemo")return blitReef(reefImg.swim&&reefImg.swim[reefFr(Tm,e.ph)],sx,sy,face<0,th,Tm,RFSC.swimN,flash,true);if(e.k==="dolphin"){let ath=th;if(e===DV.ride&&DV.hop>0){const nose=Math.max(-1.05,Math.min(1.05,Math.atan2(e.vy,Math.abs(e.vx)||20)));ath=face<0?-nose:nose;}const fr=reefImg.dswim&&reefImg.dswim[reefFr(Tm,e.ph)];if(fr)return blitReef(fr,sx,sy,face<0,ath,Tm,RFSC.swimD,flash,true);if(face<0&&reefImg.dleft)return blitReef(reefImg.dleft,sx,sy,false,-ath,Tm,RFSC.swimD,flash,true);return blitReef(reefImg.dright,sx,sy,face<0,ath,Tm,RFSC.swimD,flash,true);}if(face<0&&reefImg.left)return blitReef(reefImg.left,sx,sy,false,-th,Tm,RFSC.swimP,flash,true);return blitReef(reefImg.right,sx,sy,face<0,th,Tm,RFSC.swimP,flash,true);}
 function drawSea(T){
-  for(const e of solo){const reef=isReef(e.k),S=e.k==='tuna'?TUNA:e.k==='nemo'?NEMO:e.k==='puffer'?PUFFER:e.k==='dolphin'?DOLPHIN:MAKO,PCc=e.k==='tuna'?TUNAC:e.k==='nemo'?NEMOC:e.k==='puffer'?PUFFC:e.k==='dolphin'?DOLPHC:MAKOC,w=reef?(e.k==='dolphin'?36:e.k==='puffer'?16:14):S.frames[0][0].length,h=reef?(e.k==='dolphin'?18:e.k==='puffer'?14:10):S.frames[0].length;
+  for(const e of solo){const reef=isReef(e.k),S=e.k==='tuna'?TUNA:e.k==='nemo'?NEMO:e.k==='puffer'?PUFFER:e.k==='dolphin'?DOLPHIN:MAKO,PCc=e.k==='tuna'?TUNAC:e.k==='nemo'?NEMOC:e.k==='puffer'?PUFFC:e.k==='dolphin'?DOLPHC:MAKOC,w=reef?(e.k==='dolphin'?42:e.k==='puffer'?16:14):S.frames[0][0].length,h=reef?(e.k==='dolphin'?14:e.k==='puffer'?14:10):S.frames[0].length;
     const X=Math.round(e.x-cx-w/2),Y=Math.round(e.y-cy-h/2);if(X<-w||X>W||Y<-h||Y>H)continue;
     const fc=(e.face||-1),th=tiltOf(e.vx===0?Object.assign(e,{vx:fc*0.01}):e,0.016);
     if(reef){if(!drawReefSwim(e,e.x-cx,e.y-cy,th,T))drawRot(S.frames[reefFrame(e,T)],(e.flash||0)>T?FLASHC:PCc,e.x-cx,e.y-cy,fc>0,th,T);}
@@ -490,7 +490,7 @@ function releaseFish(f,x,y){if(f.k==='jelly'){jel.push({x,y,hx:x,hy:y,ph:Math.ra
   else solo.push(Object.assign({k:f.k,c:-999,x,y,vx:d*20,vy:0,ph:Math.random()*4,tx:x+d*250,ty:y,tt:8,cool:6},f.k==='dolphin'?{hp:4,maxhp:4}:null));}
 const FSPR=k=>k==='sard'?[SARD,SARDC]:k==='tuna'?[TUNA,TUNAC]:k==='nemo'?[NEMO,NEMOC]:k==='puffer'?[PUFFER,PUFFC]:k==='dolphin'?[DOLPHIN,DOLPHC]:k==='crab'?[HSM_S,HERMC]:k==='gcrab'?[HGI_S,HGIC]:k==='mcrab'?[MCRAB,MCRABC]:k==='jelly'?[JLS,JLC]:k==='king'?[GJS,GJC]:k==='cage'?[CG,CGC]:[MAKO,MAKOC];
 function ropeAt(s){const k=Math.max(0,s/RL),i=Math.min(RN-2,Math.floor(k)),f=Math.min(1,k-i),a=ROPE[i],b=ROPE[i+1];return [a.x+(b.x-a.x)*f,a.y+(b.y-a.y)*f];}
-function cargoSpan(k){if(k==='nemo')return 8;if(k==='puffer')return 9;if(k==='dolphin')return 18;return FSPR(k)[0].frames[0][0].length;}
+function cargoSpan(k){if(k==='nemo')return 8;if(k==='puffer')return 9;if(k==='dolphin')return 24;return FSPR(k)[0].frames[0][0].length;}
 function ropeNeed(){let s=4;for(const f of DV.carry)s+=cargoSpan(f.k)+2;return s;}
 function drawRope(T){if(!ROPE.length)return;const n=Math.min(RN-1,Math.ceil(Math.max(14,ropeNeed())/RL));
   for(let i=1;i<=n;i++){const a=ROPE[i-1],b=ROPE[i];for(let s=0;s<=2;s++){const f=s/2;put(Math.round(a.x+(b.x-a.x)*f-cx),Math.round(a.y+(b.y-a.y)*f-cy),27);}}

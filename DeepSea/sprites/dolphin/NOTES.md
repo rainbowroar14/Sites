@@ -1,52 +1,32 @@
-# Dolphin sprite — NOTES (v2)
+# Dolphin sprite — NOTES (v3)
 
-Bottlenose (*Tursiops*) side-swim for Finley's Deep Sea lagoon.
-**Primary target:** `refs/dolphin/user_pair_leap.png` (Finley leap / heart pose).
-Side profile for gameplay; leap photo drives anatomy, proportions, color, wet look.
+Finley: v2 was **FAT**. v3 is lean/elongated like `refs/dolphin/user_pair_leap.png`.
 
 ## In game
-`index.html` loads the three 1× PNGs through `DOLPHIN_SPR` (`dolphin_swim.png` frame width **84**, plus the stills as fallback). Replacing those files reskins the dolphin. Swim scale is **0.36** of the 84×36 canvas (~30×13), the same on-screen size as v1's 72×34 sheet at 0.42, so the longer snout does not grow the sprite. Facing follows movement by flipping the right-facing swim strip. Reef fish advance one frame about every 140ms.
+`index.html` loads the three 1× PNGs through `DOLPHIN_SPR` (`dolphin_swim.png` frame width **94**, plus the stills as fallback). Replacing those files reskins the dolphin. Swim scale is **0.50** of the 94×28 canvas (~33×11). v2's 0.36 scale on the fatter 84×36 sheet collapsed this needle snout, so the lean body is drawn a little longer and clearly thinner than that ~30×13 sprite. Facing follows movement by flipping the right-facing swim strip. Reef fish advance one frame about every 140ms.
 
 Live dolphins have 4 HP. The rod and spear (and jelly stings) chip that down, then the catch uses the reef-fish path at weight 4. A diver next to a living dolphin presses E to ride (2× underwater speed, hold W at the surface to breach). E again, diver damage, or the dolphin dying drops you off.
 
-## What changed vs v1
-- Longer, clearer bottlenose rostrum + visible melon→beak crease (bottleneck step)
-- Slimmer fusiform body (less diamond-chunky)
-- Falcate dorsal mid-back with aft-curved tip
-- Photo countershade: thin dark slate dorsal → steel side → pale creamy belly
-- Glossy wet speculars as small clusters on melon / back ridge / dorsal leading (not flat bands)
-- Longer tapered pec; wider horizontal fluke lobes with notch
-- Eye recessed in socket behind mouth corner
-- Palette retuned from leap photo greys (cool hue-shift kept)
-- Canvas 84×36 (was 72×34) for longer snout
-- Swim frames actually differ (wave + kick + pec lag)
+## Thickness
+- v2 torso ~**16px** tall mid-body (84×36 canvas)
+- v3 torso ~**10px** tall mid-body (94×28 canvas) ≈ **62%** of v2 vertical mass
+- Longer horizontal stretch for sleek fusiform read
 
-## Light
-- Direction: **top-left**
-- Selective outline: `#1A2430` shadow/trailing/bottom; `#344454` lit tops
-- Form dither only at thin zone seams (photo is mostly smooth)
+## Kept from v2
+Long snout, melon + crease, wet specular clusters, cream belly, falcate dorsal, socketed eye, photo cool-grey palette, selective outline, form dither
 
-## Palette (6)
-| Role | Hex |
-|------|-----|
-| outline | `#1A2430` |
-| dark slate (dorsal) | `#344454` |
-| steel mid | `#647484` |
-| lit side | `#9CACB8` |
-| wet specular | `#E4EEF4` |
-| pale belly | `#ECECE4` |
+## Palette
+`#1A2430` outline · `#344454` dark slate · `#647484` steel · `#9CACB8` lit · `#E4EEF4` wet · `#ECECE4` belly
 
-## Outputs
+## Outputs (`sprites/dolphin/`)
 | File | Size |
 |------|------|
-| dolphin.png / _8x | 84×36 right |
+| dolphin.png / _8x | 94×28 right |
 | dolphin_left.png / _8x | mirror |
-| dolphin_swim.png / _8x | 336×36 4-frame |
-| dolphin_swim.gif | 140ms/frame |
-| contact_sheet_8x.png | Finley photo + v1 vs v2 + swim |
+| dolphin_swim.png / _8x / .gif | 376×28, 140ms |
+| contact_sheet_8x.png | photo + v2 vs v3 + swim |
 
 ## Weak spots
-- Side-view flukes still read a bit crescent/V (true horizontal plane is hard in profile).
-- Melon crease is only a few pixels — strongest at 2–3× zoom.
-- Pec length is shortened vs photo for game readability.
-- Leap photo belly faces camera more than pure side; side silhouette also used prior side refs.
+- Side flukes still crescent in profile
+- Melon crease few px at 1×
+- Pec shortened so it doesn’t re-fatten the silhouette
