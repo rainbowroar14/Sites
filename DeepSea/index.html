@@ -104,11 +104,12 @@ function physics(dt,T){
     const buoy=G*(1+d/5.2)*(iy>0?0.7:1)+(d>13?(d-13)*90:0);
     if(d>0)ay-=buoy; else ay-=G*(1+d/1.5)*0.9;
     const dr=Math.exp(-0.9*dt),dv=Math.exp(-(d>4?2.2:1.0)*dt);B.vx*=dr;B.vy*=dv;
-    ax+=-slope*(boatKind?1:30);if(!ix)B.vx*=Math.exp(-(boatKind?1.6:0.8)*dt);
-    {const bowY=surfY(B.x+B.face*11,T),stY=surfY(B.x-B.face*11,T),wa=Math.atan((stY-bowY)/22)*(boatKind?0.06:1.7);
-     B.po=B.po||0;if(boatKind){B.po*=Math.exp(-4*dt);}else if(iy)B.po=Math.max(-0.9,Math.min(0.9,B.po-iy*1.6*dt));else B.po*=Math.exp(-2.5*dt);
-     if(d<5){const tgt=wa+B.po;B.ang+=(tgt-B.ang)*Math.min(1,(boatKind?1.2:8)*dt);}else if(iy&&!boatKind)B.ang+=-iy*1.6*dt;else B.ang+=(0-B.ang)*Math.min(1,3*dt);
-     const wv=(surfY(B.x,T+0.02)-surfY(B.x,T))/0.02;if(wv<0&&d>-2&&d<6){const lift=wv*(boatKind?0.04:1.25);if(B.vy>lift)B.vy+=(lift-B.vy)*Math.min(1,(boatKind?1.5:10)*dt);}}
+    ax+=-slope*(boatKind?0.02:30);if(!ix)B.vx*=Math.exp(-(boatKind?1.6:0.8)*dt);
+    {const bowY=surfY(B.x+B.face*11,T),stY=surfY(B.x-B.face*11,T),wa=Math.atan((stY-bowY)/22)*(boatKind?0.004:1.7);
+     B.po=B.po||0;if(boatKind){B.po=0;}else if(iy)B.po=Math.max(-0.9,Math.min(0.9,B.po-iy*1.6*dt));else B.po*=Math.exp(-2.5*dt);
+     if(boatKind){B.ang+=(0-B.ang)*Math.min(1,10*dt);}else if(d<5){const tgt=wa+B.po;B.ang+=(tgt-B.ang)*Math.min(1,8*dt);}else if(iy)B.ang+=-iy*1.6*dt;else B.ang+=(0-B.ang)*Math.min(1,3*dt);
+     const wv=(surfY(B.x,T+0.02)-surfY(B.x,T))/0.02;if(!boatKind&&wv<0&&d>-2&&d<6){const lift=wv*1.25;if(B.vy>lift)B.vy+=(lift-B.vy)*Math.min(1,10*dt);}}
+    if(boatKind&&d>-2&&d<10){B.syS=(B.syS===undefined?sy:B.syS+(sy-B.syS)*Math.min(1,0.12*dt));B.vy*=Math.exp(-8*dt);B.y+=(B.syS-B.y)*Math.min(1,3.5*dt);}
     const sx=B.x-B.face*Math.cos(B.ang)*14,sy2=surfY(sx,T);
     if(th&&d<10){const n=2+Math.floor(Math.abs(B.vx)/60);
       for(let i=0;i<n;i++){const a=(30+Math.random()*40)*Math.PI/180,v=35+Math.random()*50+Math.abs(B.vx)*0.13;
@@ -118,6 +119,7 @@ function physics(dt,T){
     if(Math.abs(B.vx)>30&&d<10&&Math.random()<0.9)spawn(sx,sy2,0,0,1.2+Math.random()*0.8,3);
     if(d<8&&Math.abs(slope*B.vx)>45&&Math.random()<0.25)splash(B.x+B.face*13,surfY(B.x+B.face*13,T),12,0.8);
     if(th&&d>10)spawn(sx,B.y,-B.face*10*Math.random(),-5,1+Math.random(),2);
+    if(boatKind&&Math.random()<dt*(5+Math.min(8,Math.abs(B.vx)*0.1))){const mx=B.x-B.face*4+(Math.random()-0.5)*4,my=B.y-Math.round(26*FBSC)+(Math.random()-0.5)*3;spawn(mx,my,-B.face*(1+Math.random()*5)+(Math.random()-0.5)*3,-(10+Math.random()*22),1.0+Math.random()*1.4,5);}
   }else{
     B.vx*=Math.exp(-0.15*dt);
     if(ix){ax+=ix*33;
@@ -166,6 +168,31 @@ function finishHook(e,T){e.onHook=false;if(fish.stick===e)fish.stick=null;const 
 function hookDamage(e,T){if(e.maxhp===undefined)e.maxhp=e.hp!==undefined?e.hp:(e.k==='tuna'?2:e.k==='mako'?5:e.k==='king'?10:2);if(e.hp===undefined)e.hp=e.maxhp;e.hp--;e.hpShow=T+3;e.flash=T+0.2;fish.tug=1;fish.tick=T+0.5;bleed(e.x,e.y,e.hp<=0?8:4);if(e.hp<=0)finishHook(e,T);else if(e.k==='mako')makoHurt(e,T);}
 function hookOn(e,T){if(e.k==='jelly'&&e.hp===undefined&&!e.maxhp){e.maxhp=2;e.hp=2;}if(e.k==='king'&&e.hp===undefined&&!e.maxhp){e.maxhp=10;e.hp=10;}if(e.k==='dolphin'&&e.hp===undefined&&!e.maxhp){e.maxhp=4;e.hp=4;}if(e===DV.ride)DV.ride=null;e.onHook=true;e.chase=null;fish.stick=e;hookDamage(e,T);}
 function castKey(){if(fish.st===0){fish.st=1;fish.t=0;clearCast();}else if(fish.st>=2)fish.st=4;}
+// ---- fishing-boat net (R): hangs under hull, fish that touch go in
+const NET={st:0,dep:0,maxDep:52,load:[],w:38,h:22};const NET_CAP=12;
+function netW(){let w=0;for(const f of NET.load)w+=fw(f.k||'student');return w;}
+function netFit(k){return netW()+fw(k)<=NET_CAP;}
+function clearNet(T,dump){if(dump&&NET.load.length){for(const f of NET.load)deck.push(newDeck(f.k||'student'));saveDeck();if(T!==undefined)cageMsg('NET CATCH +'+NET.load.length,T,1.6);}NET.load.length=0;NET.st=0;NET.dep=0;}
+function netKey(T){if(!boatKind){castKey();return;}if(NET.st===0){NET.st=1;NET.dep=0;cageMsg('NET OUT',T,1.2);}else if(NET.st===1||NET.st===2){NET.st=3;cageMsg('REELING NET',T,1.2);}}
+function netBox(){return{x:B.x,y:B.y+10+NET.dep*0.55,hw:NET.w*0.5,hh:Math.max(8,NET.h*0.5+NET.dep*0.2)};}
+function inNet(x,y){const b=netBox();return Math.abs(x-b.x)<=b.hw&&Math.abs(y-b.y)<=b.hh;}
+function netSecure(k,T,x,y){if(!netFit(k)){if(T<(NET.fullT||0))return false;NET.fullT=T+1.2;cageMsg(netW()>=NET_CAP?'NET FULL':'TOO HEAVY',T,1.2);return false;}NET.load.push({t:T,k});if(x!==undefined){bleed(x,y,3);for(let q=0;q<4;q++)spawn(x+(Math.random()-0.5)*4,y,(Math.random()-0.5)*10,-6,0.5+Math.random()*0.4,2);}return true;}
+function tryNetCatch(T){if(NET.st<1||NET.st>2||NET.dep<10)return;const b=netBox();
+  for(const [,s] of schools)for(let i=s.fish.length-1;i>=0;i--){const f=s.fish[i];if(!inNet(f.x,f.y))continue;if(!netSecure('student',T,f.x,f.y))return;s.fish.splice(i,1);}
+  for(const [,s] of sardSchools)for(let i=s.fish.length-1;i>=0;i--){const f=s.fish[i];if(!inNet(f.x,f.y))continue;if(!netSecure('sardine',T,f.x,f.y))return;s.fish.splice(i,1);}
+  for(let i=solo.length-1;i>=0;i--){const e=solo[i];if(e.held||e.onHook||!inNet(e.x,e.y))continue;if(e.k==='mako'||e.k==='dolphin')continue;if(!netSecure(e.k,T,e.x,e.y))return;solo.splice(i,1);for(const s of solo)if(s.chase===e)s.chase=null;}
+  for(let i=jel.length-1;i>=0;i--){const j=jel[i];if(j.onHook||!inNet(j.x,j.y))continue;if(!netSecure('jelly',T,j.x,j.y))return;jel.splice(i,1);}
+  for(let i=gulls.length-1;i>=0;i--){const g=gulls[i];if(g.st!=='loot'||!inNet(g.x,g.y))continue;if(!netSecure('seagull',T,g.x,g.y))return;gulls.splice(i,1);}
+}
+function fboatSmoke(dt,x,y,face,mul){if(Math.random()<dt*(4.5*mul+Math.min(6,Math.abs(B.vx||0)*0.08*mul))){const mx=x-face*4+(Math.random()-0.5)*4,my=y-Math.round(26*FBSC)+(Math.random()-0.5)*3;spawn(mx,my,-face*(1+Math.random()*5)+(Math.random()-0.5)*3,-(10+Math.random()*20),1.0+Math.random()*1.3,5);}}
+function updNet(dt,T){if(PARK.on&&PARK.kind)fboatSmoke(dt,PARK.x,PARK.y||surfY(PARK.x,T),PARK.face||1,0.55);if(!boatKind){if(NET.st)clearNet(T,1);return;}
+  if(NET.st===1){NET.dep=Math.min(NET.maxDep,NET.dep+70*dt);if(NET.dep>=NET.maxDep)NET.st=2;}
+  else if(NET.st===3){NET.dep=Math.max(0,NET.dep-90*dt);if(NET.dep<=0)clearNet(T,1);}
+  if(NET.st===1||NET.st===2)tryNetCatch(T);}
+function drawNet(T){if(!boatKind||!NET.st||NET.dep<=0)return;const bx=B.x-cx,by=B.y-cy-4,hw=Math.round(NET.w*0.5),top=by+8,bot=by+8+NET.dep;
+  for(let i=0;i<=Math.floor(NET.dep);i++){const t=i/Math.max(1,NET.dep),ox=Math.round(Math.sin(T*3+i*0.2)*1.2);put(Math.round(bx-hw+ox),Math.round(top+i),9);put(Math.round(bx+hw-ox),Math.round(top+i),9);if(i%3===0)put(Math.round(bx+ox*0.5),Math.round(top+i),8);}
+  const ny=bot,nh=16;for(let y=0;y<nh;y++)for(let x=-hw;x<=hw;x++){const edge=y===0||y===nh-1||x===-hw||x===hw;const mesh=((x+y*2)&3)===0;if(!(edge||mesh))continue;const px=Math.round(bx+x+Math.sin(T*2.5+y)*1),py=Math.round(ny+y);put(px,py,edge?21:22);}
+  for(let n=0;n<NET.load.length&&n<8;n++){const a=n/8*Math.PI*2+T*1.5,rx=Math.cos(a)* (hw-6),ry=4+(n%3)*3;put(Math.round(bx+rx),Math.round(ny+6+ry),14);}}
 // Steering accel and speed caps are 0.7×. Up never climbs: it sinks at 10% of the unassisted cruise (SINK_A).
 const ROD_SLOW=0.7,SINK_A=40,SINK_UP=SINK_A/1.7*0.1;
 function steerHook(dt,T){const [kx,ky]=hookKeys();let hvx=fish.hvx||0,hvy=fish.hvy||0;hvx+=kx*240*ROD_SLOW*dt;hvy+=(ky>0?220*ROD_SLOW:ky<0?SINK_A*0.1:SINK_A)*dt;
@@ -455,10 +482,10 @@ let vp=2,vpT=0,boatKind=0;const FBSC=1.5;const PARK={on:0,x:0,y:0,face:1,kind:0}
 function boatMaxVp(){return boatKind?4:2;}
 function updTurn(dt){const mx=boatMaxVp(),tg=mx*B.face;if(vp===tg){vpT=0;return;}const step=boatKind?0.18:0.09;vpT+=dt;while(vpT>=step&&vp!==tg){vpT-=step;vp+=Math.sign(tg-vp);if(Math.abs(vp)>mx)vp=mx*Math.sign(vp||tg);}}
 function startBoatDrop(T){DROP.on=1;DROP.x=B.x+B.face*48;DROP.y=surfY(DROP.x,T)-240;DROP.vy=30;DROP.face=B.face||1;cageMsg('FISHING BOAT INCOMING!',T,2);}
-function updDrop(dt,T){if(!DROP.on)return;DROP.vy+=220*dt;DROP.y+=DROP.vy*dt;const sy=surfY(DROP.x,T);if(DROP.y>=sy-1){DROP.y=sy;DROP.on=0;for(let i=0;i<48;i++){const a=-Math.PI/2+(Math.random()-0.5)*2.4,v=18+Math.random()*55;spawn(DROP.x+(Math.random()-0.5)*22,sy-1,Math.cos(a)*v*0.35,Math.sin(a)*v*0.2-10-Math.random()*30,0.7+Math.random()*0.9,5);}splash(DROP.x,sy,36,1.1);PARK.on=1;PARK.x=B.x;PARK.face=B.face;PARK.kind=0;B.x=DROP.x;boatKind=1;STORE.set('deepsea_boat_kind','1');B.x=DROP.x;B.y=sy;B.vx=0;B.vy=0;B.face=DROP.face;vp=boatMaxVp()*B.face;cageMsg('FISHING BOAT READY! B TO SWITCH',T,3);}}
+function updDrop(dt,T){if(!DROP.on)return;DROP.vy+=220*dt;DROP.y+=DROP.vy*dt;const sy=surfY(DROP.x,T);if(DROP.y>=sy-1){DROP.y=sy;DROP.on=0;for(let i=0;i<72;i++){const a=-Math.PI/2+(Math.random()-0.5)*2.6,v=14+Math.random()*60;spawn(DROP.x+(Math.random()-0.5)*28,sy-2-Math.random()*8,Math.cos(a)*v*0.3,Math.sin(a)*v*0.15-14-Math.random()*36,1.0+Math.random()*1.4,5);}splash(DROP.x,sy,36,1.1);PARK.on=1;PARK.x=B.x;PARK.face=B.face;PARK.kind=0;B.x=DROP.x;boatKind=1;STORE.set('deepsea_boat_kind','1');B.x=DROP.x;B.y=sy;B.vx=0;B.vy=0;B.face=DROP.face;vp=boatMaxVp()*B.face;cageMsg('FISHING BOAT READY! B TO SWITCH',T,3);}}
 function drawDropBoat(){if(!DROP.on)return;const SPR=FBOAT[4],SW=SPR[0].length,SH=SPR.length,SC=SW>>1,SCY=Math.floor(SH*0.72);const bx=DROP.x-cx,by=DROP.y-cy-4,vf=DROP.face||1,hw=Math.ceil(SW*FBSC/2)+1;for(let yy=-Math.ceil(SCY*FBSC);yy<Math.ceil((SH-SCY)*FBSC);yy++)for(let xx=-hw;xx<=hw;xx++){let u=xx/FBSC;if(vf<0)u=-u;const x=Math.round(u+SC),y=Math.round(yy/FBSC+SCY);if(x<0||x>=SW||y<0||y>=SH)continue;const ch=SPR[y][x];if(ch==='.')continue;const px=Math.round(bx+xx),py=Math.round(by+yy);if(px>=0&&px<W&&py>=0&&py<H)buf[py*W+px]=FPAL[+ch];}}
 function drawPark(T){if(!PARK.on)return;PARK.y=surfY(PARK.x,T);const k=PARK.kind,SPR=k?FBOAT[4]:BOAT,pal=k?FPAL:BPAL,scy=k?Math.floor(SPR.length*0.72):8,SW=SPR[0].length,SH=SPR.length,SC=Math.floor(SW/2),sc=k?FBSC:1,bx=PARK.x-cx,by=PARK.y-cy-4,vf=PARK.face||1,hw=Math.ceil(SW*sc/2)+1,hh=Math.ceil(SH*sc)+1;for(let y=-hh;y<=hh;y++)for(let x=-hw;x<=hw;x++){let u=x/sc;if(vf<0)u=-u;const X=Math.round(u+SC),Y=Math.round(y/sc+scy);if(X<0||X>=SW||Y<0||Y>=SH)continue;const ch=SPR[Y][X];if(ch==='.')continue;const px=Math.round(bx+x),py=Math.round(by+y);if(px>=0&&px<W&&py>=0&&py<H)buf[py*W+px]=pal[+ch];}}
-function toggleBoat(T){if(!UP.fboat||DROP.on){if(!UP.fboat)cageMsg('BUY FISHING BOAT IN SHOP',T,1.5);return;}if(PARK.on&&Math.abs(PARK.x-B.x)>90){cageMsg('SAIL TO YOUR OTHER BOAT TO SWITCH',T,1.6);return;}if(PARK.on){const ox=PARK.x,of=PARK.face;PARK.x=B.x;PARK.face=B.face;PARK.kind=boatKind;B.x=ox;B.y=surfY(ox,T);B.vx=B.vy=0;B.face=of;}boatKind^=1;STORE.set('deepsea_boat_kind',String(boatKind));vp=boatMaxVp()*B.face;cageMsg(boatKind?'FISHING BOAT':'STARTER BOAT',T,1.4);}
+function toggleBoat(T){if(!UP.fboat||DROP.on){if(!UP.fboat)cageMsg('BUY FISHING BOAT IN SHOP',T,1.5);return;}if(PARK.on&&Math.abs(PARK.x-B.x)>90){cageMsg('SAIL TO YOUR OTHER BOAT TO SWITCH',T,1.6);return;}if(boatKind)clearNet(T,1);if(PARK.on){const ox=PARK.x,of=PARK.face;PARK.x=B.x;PARK.face=B.face;PARK.kind=boatKind;B.x=ox;B.y=surfY(ox,T);B.vx=B.vy=0;B.face=of;}boatKind^=1;STORE.set('deepsea_boat_kind',String(boatKind));vp=boatMaxVp()*B.face;cageMsg(boatKind?'FISHING BOAT':'STARTER BOAT',T,1.4);}
 const THRUST={"pal":["#121418","#5a626e","#30363e","#8c94a0","#c82828","#464c56","#dce0e6"],"frames":[["............","......0000..",".....011220.","..00.013120.","..04.011220.","...0.00500..","......050...","......050...","......050...",".....00500..","....0222220.","....0211206.","...02222066.","....0000.6..","............","............"],["............","......0000..",".....011220.","..00.013120.","..04.011220.","...0.00500..","......050...","......050...","......050...",".....00500..","....0222220.","...021120.6.","..0222206.6.",".....00006..","............","............"],["............","......0000..",".....011220.","..00.013120.","..04.011220.","...0.00500..","......050...","......050...","......050...",".....00500..","....0222220.","...02112066.","...022220.6.","....0000.6..","............","............"],["............","......0000..",".....011220.","..00.013120.","..04.011220.","...0.00500..","......050...","......050...","......050...",".....00500..","....0222220.","....0211260.","....0222260.","......0006..","............","............"]]};const THRUSTC=THRUST.pal.map(h=>{const n=parseInt(h.slice(1),16);return [n>>16,(n>>8)&255,n&255];});
 function drawThrust(c,s_,bx,by,vf){const moving=!!(keys.KeyA||keys.KeyD||keys.ArrowLeft||keys.ArrowRight);
   const fr=moving?((Math.floor(T*20)%4)+4)%4:0,rows=THRUST.frames[fr],RW=rows[0].length,RH=rows.length,mountX=3;
@@ -482,7 +509,7 @@ function drawBoat(){const vf=vp===0?1:Math.sign(vp),av=Math.abs(vp);
     const X=Math.round(u+SC),Y=Math.round(v+scy);if(X<0||X>=SW||Y<0||Y>=SH)continue;const ch=SPR[Y][X];if(ch==='.')continue;
     const px=Math.round(bx+x),py=Math.round(by+y);if(px>=0&&px<W&&py>=0&&py<H)buf[py*W+px]=pal[+ch];}
   if(av>0)drawDeck(c,s_,bx,by,sideish?1:0.62,vf,th,T);}
-function drawParts(){for(const p of parts){const f=p.life/p.max;let col=p.kind==5?(f>0.55?23:(f>0.25?24:8)):p.kind==2?(f>0.5?6:5):(f>0.45?10:(f>0.2?6:5));
+function drawParts(){for(const p of parts){const f=p.life/p.max;let col=p.kind==5?(f>0.55?28:(f>0.25?17:23)):p.kind==2?(f>0.5?6:5):(f>0.45?10:(f>0.2?6:5));
   if(p.kind==3&&f<0.5&&bay(Math.round(p.x),Math.round(p.y))>f*2)continue;
   const X=Math.round(p.x-cx),Y=Math.round(p.y-cy);put(X,Y,col);if(p.s>1&&f>0.3){put(X+1,Y,col);put(X,Y+1,col);put(X+1,Y+1,col);}}}
 addEventListener('keydown',e=>{keys[e.code]=1;if(e.code.startsWith('Arrow'))e.preventDefault();});
@@ -490,7 +517,7 @@ addEventListener('keyup',e=>{keys[e.code]=0;});
 function resize(){W=Math.max(160,Math.min(640,Math.round(H*innerWidth/innerHeight)));if(cv.width!==W){cv.width=W;img=ctx.createImageData(W,H);buf=new Uint32Array(img.data.buffer);}
   const s=Math.min(innerWidth/W,innerHeight/H);cv.style.width=Math.floor(W*s)+'px';cv.style.height=Math.floor(H*s)+'px';}
 function toggleFS(){try{const d=document,e=d.documentElement;let r;if(d.fullscreenElement||d.webkitFullscreenElement){const f=d.exitFullscreen||d.webkitExitFullscreen;if(f)r=f.call(d);}else{const f=e.requestFullscreen||e.webkitRequestFullscreen;if(f)r=f.call(e);}if(r&&r.catch)r.catch(()=>{});}catch(err){}}
-document.getElementById('fs').onclick=toggleFS;addEventListener('keydown',e=>{if(e.code==='KeyF'&&!e.repeat){if(UP.flashlight){FL.on^=1;if(typeof T==='number')cageMsg(FL.on?'FLASHLIGHT ON':'FLASHLIGHT OFF',T,1.2);}else toggleFS();}if(e.code==='KeyB'&&!e.repeat&&!talk.on&&!DV.on)toggleBoat(typeof T==='number'?T:0);unlockAudio();if(e.code==='Space'){e.preventDefault();if(!e.repeat){if(DV.on)fireSpear();else if(!talk.on&&fish.st===0)exitBoat();}}if(e.code==='KeyR'&&!e.repeat&&!talk.on&&!DV.on)castKey();if(e.code==='KeyE'&&!e.repeat){if(DV.on){if(DV.ride)dismountDolphin(T,'OFF THE DOLPHIN');else if(!harvestCage(T)&&!mountDolphin(T))tryEnter();}else talkKey();}if(e.code==='Escape'){talkEsc();}});document.addEventListener('fullscreenchange',resize);
+document.getElementById('fs').onclick=toggleFS;addEventListener('keydown',e=>{if(e.code==='KeyF'&&!e.repeat){if(UP.flashlight){FL.on^=1;if(typeof T==='number')cageMsg(FL.on?'FLASHLIGHT ON':'FLASHLIGHT OFF',T,1.2);}else toggleFS();}if(e.code==='KeyB'&&!e.repeat&&!talk.on&&!DV.on)toggleBoat(typeof T==='number'?T:0);unlockAudio();if(e.code==='Space'){e.preventDefault();if(!e.repeat){if(DV.on)fireSpear();else if(!talk.on&&fish.st===0)exitBoat();}}if(e.code==='KeyR'&&!e.repeat&&!talk.on&&!DV.on){if(boatKind)netKey(typeof T==='number'?T:0);else castKey();}if(e.code==='KeyE'&&!e.repeat){if(DV.on){if(DV.ride)dismountDolphin(T,'OFF THE DOLPHIN');else if(!harvestCage(T)&&!mountDolphin(T))tryEnter();}else talkKey();}if(e.code==='Escape'){talkEsc();}});document.addEventListener('fullscreenchange',resize);
 addEventListener('resize',resize);resize();
 const put=(x,y,c)=>{if(x>=0&&x<W&&y>=0&&y<H)buf[y*W+x]=P32[c];};
 // kelp: chunks of 220px, some contain a forest
@@ -522,7 +549,7 @@ const F={B:"110101110101110",G:"111100101101111",J:"001001001101111",K:"10110111
 function text(s,x,y,c){for(const ch of s){const g=F[ch]||F[" "];for(let i=0;i<15;i++)if(g[i]=="1")put(x+i%3,y+(i/3|0),c);x+=4;}}
 function text2x(s,x,y,c){for(const ch of s){const g=F[ch]||F[" "];for(let i=0;i<15;i++)if(g[i]=="1"){const px=x+(i%3)*2,py=y+(i/3|0)*2;put(px,py,c);put(px+1,py,c);put(px,py+1,c);put(px+1,py+1,c);}x+=8;}}
 function fleeRot(o,dx,dy,d,T,dt){if(!((o.fleeT||0)>T)||o.fa===undefined){o.fa=(Math.random()*2-1)*0.175;o.ft=0;}o.ft=Math.max(-0.175,Math.min(0.175,(o.ft||0)+(Math.random()*2-1)*0.6*dt));const a=o.fa+o.ft,c=Math.cos(a),n=Math.sin(a),ux=dx/d,uy=dy/d;return[ux*c-uy*n,ux*n+uy*c];}
-const VER="V20";
+const VER="V21";
 function textA(s,x,y,c,a){for(const ch of s){const g=F[ch]||F[" "];for(let i=0;i<15;i++)if(g[i]=="1"){const px=x+(i%3),py=y+(i/3|0);if(px>=0&&px<W&&py>=0&&py<H){const dst=buf[py*W+px],src=P32[c],dr=dst&255,dg=(dst>>8)&255,db=(dst>>16)&255,sr=src&255,sg=(src>>8)&255,sb=(src>>16)&255;const r=(dr+(sr-dr)*a)|0,g2=(dg+(sg-dg)*a)|0,b=(db+(sb-db)*a)|0;buf[py*W+px]=0xff000000|(b<<16)|(g2<<8)|r;}}x+=4;}}
 function drawVer(){const s=VER;textA(s,W-2-s.length*4,H-7,10,0.5);}
 const FD={" ":"00000000000000000000000000000000000",A:"01110100011000111111100011000110001",B:"11110100011000111110100011000111110",C:"01111100001000010000100001000001111",D:"11110100011000110001100011000111110",E:"11111100001000011110100001000011111",F:"11111100001000011110100001000010000",G:"01111100001000010111100011000101110",H:"10001100011000111111100011000110001",I:"11111001000010000100001000010011111",J:"00111000100001000010000101001001100",K:"10001100101010011000101001001010001",L:"10000100001000010000100001000011111",M:"10001110111010110101100011000110001",N:"10001110011010110011100011000110001",O:"01110100011000110001100011000101110",P:"11110100011000111110100001000010000",Q:"01110100011000110001101011001001101",R:"11110100011000111110101001001010001",S:"01111100001000001110000010000111110",T:"11111001000010000100001000010000100",U:"10001100011000110001100011000101110",V:"10001100011000110001100010101000100",W:"10001100011000110101101011010101010",X:"10001100010101000100010101000110001",Y:"10001100010101000100001000010000100",Z:"11111000010001000100010001000011111","0":"01110100011001110101110011000101110","1":"00100011000010000100001000010001110","2":"01110100010000100010001000100011111","3":"11110000010000101110000010000111110","4":"10001100011000111111000010000100001","5":"11111100001000011110000010000111110","6":"01110100001000011110100011000101110","7":"11111000010001000100010000100001000","8":"01110100011000101110100011000101110","9":"01110100011000101111000010000101110","!":"00100001000010000100001000000000100",".":"00000000000000000000000000000000100",",":"00000000000000000000000000010001000","?":"01110100010000100010001000000000100","'":"00100001000000000000000000000000000","-":"00000000000000011111000000000000000","/":"00001000100001000100010000100010000","[":"01110010000100001000010000100001110","]":"01110000100001000010000100001001110","%":"11001110100001000100010000101110011",":":"00000001000000000000000000010000000"};
@@ -991,7 +1018,7 @@ function stepReefFish(e,dt,Tm){
 let last=performance.now(),T=DAY_CYCLE*0.45;loadDeck();
 let frameErr=0;function frame(now){try{frame0(now);}catch(e){if(!frameErr){frameErr=1;console.warn('frame error (logged once):',e);}last=now;}requestAnimationFrame(frame);}
 function frame0(now){const dt=Math.min(0.05,(now-last)/1000);last=now;T+=dt;
-  physics(dt,T);if(HOLD){B.x=HOLD.x;B.y=HOLD.y;B.vx=B.vy=0;cx=B.x-W/2;cy=B.y-H/2;}updDrop(dt,T);updTurn(dt);updFish(dt,T);updSchools(dt,T);updSea(dt,T);updGulls(dt,T);updCrabs(dt,T);updCages(dt,T);updJelly(dt,T);updFreeKing(dt,T);updBoss(dt,T);updDiver(dt,T);updFeed(dt,T);
+  physics(dt,T);if(HOLD){B.x=HOLD.x;B.y=HOLD.y;B.vx=B.vy=0;cx=B.x-W/2;cy=B.y-H/2;}updDrop(dt,T);updTurn(dt);updNet(dt,T);updFish(dt,T);updSchools(dt,T);updSea(dt,T);updGulls(dt,T);updCrabs(dt,T);updCages(dt,T);updJelly(dt,T);updFreeKing(dt,T);updBoss(dt,T);updDiver(dt,T);updFeed(dt,T);
   const ox=Math.floor(cx),oy=Math.floor(cy);
   // water + sky + surface. Day, night, and the lagoon tint live in seaPixel.
   DAYK=dayK(T);
@@ -1020,7 +1047,7 @@ function frame0(now){const dt=Math.min(0.05,(now-last)/1000);last=now;T+=dt;
       const lit=(-x-y)/(r*1.6)+0.3;const edge=(x/1.3)**2+y*y>(r-1.2)*(r-1.2);put(X,Y,edge&&(x>0||y>0)?0:(lit>bay(X+ox,Y+oy)+0.25?9:(lit<-0.2&&bay(X,Y)<0.6?0:8)));}}
   for(const s of kelpStalks(1,cx-40,cx+W+40))drawKelp(s,T,1,true);
   drawCorals(T);drawRavLip(T,ox,oy);
-  drawCages(T);drawCrabs(T);drawCliff(T);const sqb=drawSquid(T);drawSchools(T);drawSea(T);drawJelly(T);drawFreeKing(T);drawBoss(T);drawParts();drawGulls(T);drawPark(T);drawBoat();drawDropBoat();drawDiver(T);drawFeed(T);drawPrompt(T,sqb-SQWL*(1+0.1*pulse)-2);drawBubble(T,sqb-SQWL*(1+0.1*pulse)-2);drawDark(T);drawBossGlow(T);drawBoatMarker(T);
+  drawCages(T);drawCrabs(T);drawCliff(T);const sqb=drawSquid(T);drawSchools(T);drawSea(T);drawJelly(T);drawFreeKing(T);drawBoss(T);drawParts();drawGulls(T);drawPark(T);drawBoat();drawNet(T);drawDropBoat();drawDiver(T);drawFeed(T);drawPrompt(T,sqb-SQWL*(1+0.1*pulse)-2);drawBubble(T,sqb-SQWL*(1+0.1*pulse)-2);drawDark(T);drawBossGlow(T);drawBoatMarker(T);
   nearSquid=!DV.on&&Math.abs(B.x-SQX)<130&&B.y<40;
   // depth meter
   const dd=DV.on?DV.y-surfY(DV.x,T):B.y-surfY(B.x,T);const dep=Math.max(0,Math.round(dd/10));
