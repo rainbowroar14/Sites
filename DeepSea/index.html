@@ -140,7 +140,7 @@ function physics(dt,T){
     else{p.vy+=(pd>0&&p.kind==1?20:160)*dt;if(p.kind==0&&pd>2&&p.vy>0)p.life=Math.min(p.life,0.15);}
     p.x+=p.vx*dt;p.y+=p.vy*dt;}
   parts=parts.filter(p=>p.life>0);
-  const k=1-Math.exp(-3*dt),fc=fish.st>=2,tgx=DV.on?DV.x-W/2+DV.vx*0.4:(fc?fish.x-W/2:B.x-W/2+B.face*30+B.vx*0.25),tgy=DV.on?DV.y-H/2:(fc?fish.y-H/2:B.y-H/2);cx+=(tgx-cx)*k;cy+=(tgy-cy)*(fc?1-Math.exp(-2*dt):k);cx=Math.max(cx,WALLX-44);
+  const k=1-Math.exp(-3*dt),fc=fish.st>=2,tgx=DV.on?DV.x-W/2+DV.vx*0.4:(fc?fish.x-W/2:B.x-W/2+B.face*30+B.vx*0.25),tgy=DV.on?DV.y-H/2:(fc?fish.y-H/2:B.y-H*0.72);cx+=(tgx-cx)*k;cy+=(tgy-cy)*(fc?1-Math.exp(-2*dt):k);cx=Math.max(cx,WALLX-44);
 }
 // ---- fishing: 0 idle, 1 flick, 2 flying, 3 sinking/resting, 4 reeling
 const fish={st:0,t:0,x:0,y:0,vx:0,vy:0,rod:0,load:[],stick:null,tick:0};let rodTip=[0,0];
@@ -193,7 +193,7 @@ function gullSpawn(T){const c0=Math.floor((cx-400)/520),c1=Math.floor((cx+W+400)
     // denser flocks across ocean + reef (~65% of chunks)
     if(hash(c*91+3)>0.65)continue;
     const n=hash(c*91+4)<0.45?1:(hash(c*91+5)<0.55?2:3),dir=hash(c*91+6)<0.5?-1:1,spd=26+hash(c*91+7)*18;
-    const baseY=surfY(x0,T)-(38+hash(c*91+8)*28); // ~38–66px above water, on-screen near boat
+    const baseY=surfY(x0,T)-(114+hash(c*91+8)*84); // ~114–198px above water (3× prior)
     for(let i=0;i<n;i++){const ox=(i-(n-1)/2)*18+hash(c*91+9+i)*6-3,oy=(i?((i%2)?-6:5):0)+hash(c*91+11+i)*4-2;
       gulls.push({st:'fly',g:c,x:x0+ox,y:baseY+oy,bx:ox,by:oy,vx:dir*spd,vy:0,ph:hash(c*91+13+i)*4,face:dir,spin:0});}}
   gulls=gulls.filter(g=>{if(g.st!=='fly')return true;return g.x>cx-1600&&g.x<cx+W+1600;});
@@ -216,7 +216,7 @@ function updGulls(dt,T){gullSpawn(T);
       if(g.x<WALLX+10){g.x=WALLX+10;g.vx=0;}}}
   // prune far loot
   gulls=gulls.filter(g=>g.st==='fly'||(g.x>cx-900&&g.x<cx+W+900));}
-function drawGulls(T){for(const g of gulls){const X=Math.round(g.x-cx),Y=Math.round(g.y-cy);if(X<-40||X>W+40||Y<-40||Y>H+40)continue;
+function drawGulls(T){for(const g of gulls){const X=Math.round(g.x-cx),Y=Math.round(g.y-cy);if(X<-40||X>W+40||Y<-220||Y>H+40)continue;
     const fr=SEAGULL.frames[g.st==='fly'?((Math.floor(T*1000/120+g.ph*4)%4)+4)%4:0];
     const flip=g.face<0;let ang=0;if(g.st==='fall')ang=T*g.spin;else if(g.st==='loot')ang=Math.sin(T*3+g.ph)*0.35;
     // air birds: no underwater tint (tm=0)
