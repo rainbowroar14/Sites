@@ -224,7 +224,7 @@ function drawGulls(T){for(const g of gulls){const X=Math.round(g.x-cx),Y=Math.ro
 
 // ---- student schools (boids, former sardines) + tiny sardine formation schools
 const schools=new Map();const sardSchools=new Map();
-function formOff(form,i,n,seed){const s=Math.floor(seed*1000)|0,h1=hash(s+i*17+form*91),h2=hash(s+i*31+form*53+7),h3=hash(s+i*47+form*19+13);if(form===0){return[(h1-0.5)*56+(h3-0.5)*8,(h2-0.5)*22];}if(form===1){const side=h3<0.5?-1:1;return[side*(14+h1*20)+(h1-0.5)*10,(h2-0.5)*20+(h3-0.5)*6];}const core=h3<0.62;if(core)return[(h1-0.5)*30+(h2-0.5)*6,(h2-0.5)*16];return[(h1-0.5)*64,(h2-0.5)*26];}
+function formOff(form,i,n,seed){const s=Math.floor(seed*1000)|0,h1=hash(s+i*17+form*91),h2=hash(s+i*31+form*53+7),h3=hash(s+i*47+form*19+13),h4=hash(s+i*59+form*37+21),wv=hash(s+5)*6.28,sk=(hash(s+9)-0.5)*0.35;if(form===0){const u=(h1-0.5),x=u*170+(h3-0.5)*22,tp=1-Math.abs(u)*1.3;return[x,Math.sin(u*5+wv)*12+x*sk+(h2-0.5)*26*tp+(h4-0.5)*8];}if(form===1){const side=h3<0.45?-1:1,len=side<0?70:95,u=h1-0.5;const x=side*(38+h4*30)+u*len,y=side*(8+hash(s+3)*10)+Math.sin(u*4+wv)*8+(h2-0.5)*22*(1-Math.abs(u));return[x,y+x*sk*0.5];}const u=h1-0.5,x=u*(h3<0.6?120:200)+(h4-0.5)*20;return[x,Math.sin(u*6+wv)*14+x*sk+(h2-0.5)*(h3<0.6?20:34)*(1-Math.abs(u)*1.2)];}
 
 function updSchools(dt,T){const c0=Math.floor((cx-250)/500),c1=Math.floor((cx+W+250)/500);
   for(let c=c0;c<=c1;c++){if(schools.has(c))continue;const h=hash(c*31+7);const s={c,fish:[]};schools.set(c,s);
