@@ -303,15 +303,15 @@ function soloSpawn(){const c0=Math.floor((cx-300)/400),c1=Math.floor((cx+W+300)/
     if(tw>0.92)continue;
     const ocean=1-tw;
     if(hash(c*53+1)<0.55*ocean)solo.push({k:'tuna',c,x:x0,y:220+hash(c*53+2)*180,vx:-10,vy:0,ph:hash(c*53+3)*4,tx:x0,ty:300,tt:0});
-    if(hash(c*71+5)<0.3*ocean){const fl=floorY(x0);const my=Math.max(fl-140,Math.min(fl-40,fl-50-hash(c*71+6)*90));solo.push({k:'mako',c,x:x0+90,y:my,vx:18,vy:0,ph:hash(c*71+7)*4,tx:x0,ty:my,tt:0,cool:0,hp:5,maxhp:5,knowT:0,mode:'patrol',fleeX:0,fleeY:0,fleeUntil:0,panicUntil:0,atkCd:0});}}
+    if(hash(c*71+5)<0.3*ocean){const fl=floorY(x0);const sf0=surfY(x0,0);const my=Math.min(fl-40,Math.max(sf0+800,sf0+MAKO_DEEP+(hash(c*71+6)-0.5)*200));solo.push({k:'mako',c,x:x0+90,y:my,vx:18,vy:0,ph:hash(c*71+7)*4,tx:x0,ty:my,tt:0,cool:0,hp:5,maxhp:5,knowT:0,mode:'patrol',fleeX:0,fleeY:0,fleeUntil:0,panicUntil:0,atkCd:0});}}
   solo=solo.filter(e=>{if(e.onHook)return true;const keep=e.x>cx-1400&&e.x<cx+W+1400;if(!keep)soloC.delete(e.c);return keep;});}
 function steer(e,tx,ty,sp,dt,acc){const dx=tx-e.x,dy=ty-e.y,d=Math.hypot(dx,dy)||1;e.vx+=(dx/d*sp-e.vx)*Math.min(1,acc*dt);e.vy+=(dy/d*sp-e.vy)*Math.min(1,acc*dt);}
 function bleed(x,y,n){for(let i=0;i<n&&blood.length<240;i++)blood.push({x:x+(Math.random()-0.5)*6,y:y+(Math.random()-0.5)*5,vx:(Math.random()-0.5)*3,vy:-0.3-Math.random()*0.9,r0:1.5+Math.random()*1,l:0,m:8+Math.random()*4});}
-const MAKO_FOV=Math.PI,MAKO_SIGHT=210,MAKO_SMELL=95,MAKO_MEM=10,MAKO_BITE=14,MAKO_ATKCD=1.2,MAKO_FLEE_TO=5,MAKO_PANIC=60,MAKO_DEEP=650,MAKO_LEASH=W*1.5;
+const MAKO_FOV=Math.PI,MAKO_SIGHT=210,MAKO_SMELL=95,MAKO_MEM=10,MAKO_BITE=14,MAKO_ATKCD=1.2,MAKO_FLEE_TO=5,MAKO_PANIC=60,MAKO_DEEP=1000,MAKO_LEASH=W*1.5;
 function makoHead(s){const sp=Math.hypot(s.vx||0,s.vy||0);return sp>2?Math.atan2(s.vy,s.vx):(s.face||1)>0?0:Math.PI;}
 function makoSees(s,tx,ty,rng){const dx=tx-s.x,dy=ty-s.y,d=Math.hypot(dx,dy);if(d>(rng||MAKO_SIGHT))return false;let da=Math.atan2(dy,dx)-makoHead(s);da=Math.atan2(Math.sin(da),Math.cos(da));return Math.abs(da)<=MAKO_FOV*0.5;}
 function makoSmellBlood(s){for(const b of blood){if(Math.hypot(b.x-s.x,b.y-s.y)<MAKO_SMELL)return b;}return null;}
-function makoOffscreenFlee(s,T){const side=Math.random()<0.5?-1:1;let dist=180+Math.random()*160,fx=s.x+side*dist;if(fx>=cx-40&&fx<=cx+W+40)fx=side<0?cx-50-Math.random()*20:cx+W+50+Math.random()*20;if(Math.abs(fx-s.x)>320)fx=s.x+Math.sign(fx-s.x)*320;if(Math.abs(fx-s.x)<150)fx=s.x+Math.sign(fx-s.x||side)*150;const fl=floorY(fx),sf=surfY(fx,T);const yLo=Math.max(sf+MAKO_DEEP,fl-180),yHi=Math.max(yLo+8,fl-30);return{x:fx,y:yLo+Math.random()*(yHi-yLo)};}
+function makoOffscreenFlee(s,T){const side=Math.random()<0.5?-1:1;let dist=180+Math.random()*160,fx=s.x+side*dist;if(fx>=cx-40&&fx<=cx+W+40)fx=side<0?cx-50-Math.random()*20:cx+W+50+Math.random()*20;if(Math.abs(fx-s.x)>320)fx=s.x+Math.sign(fx-s.x)*320;if(Math.abs(fx-s.x)<150)fx=s.x+Math.sign(fx-s.x||side)*150;const fl=floorY(fx),sf=surfY(fx,T);const fy=Math.min(fl-40,Math.max(sf+800,sf+MAKO_DEEP+(Math.random()-0.5)*300));return{x:fx,y:fy};}
 function makoMouth(s){const face=Math.abs(s.vx||0)>1?(s.vx>0?1:-1):(s.face||-1);return[s.x+face*29,s.y+4];}
 function makoHurt(e,T){const p=makoOffscreenFlee(e,T);e.fleeX=p.x;e.fleeY=p.y;e.fleeT=0;e.chase=null;e.knowT=0;e.cool=Math.max(e.cool||0,1);if((e.hp||5)<=2){e.mode='panic';e.panicUntil=T+MAKO_PANIC;}else{e.mode='flee';e.fleeUntil=T+MAKO_FLEE_TO;}}
 function updSea(dt,T){soloSpawn();
@@ -352,12 +352,12 @@ function updSea(dt,T){soloSpawn();
     if(s.chase&&s.chase.onHook)s.chase=null;
     if(s.chase){s.mode='patrol';steer(s,s.chase.x,s.chase.y,40,dt,2.8);const[mx,my]=makoMouth(s);
       if(Math.hypot(s.chase.x-mx,s.chase.y-my)<12){solo=solo.filter(e=>e!==s.chase);s.held={bites:0,max:3+Math.floor(Math.random()*2),next:T+1+Math.random()};s.chase=null;bleed(mx,my,10);}}
-    else{s.mode='patrol';s.tt-=dt;if(s.tt<=0||Math.hypot(s.tx-s.x,s.ty-s.y)<14){const fl=floorY(s.x);s.tx=s.x+(Math.random()-0.5)*400;s.ty=fl-40-Math.random()*100;s.tt=8+Math.random()*8;}steer(s,s.tx,s.ty,20,dt,0.75);}}
+    else{s.mode='patrol';s.tt-=dt;if(s.tt<=0||Math.hypot(s.tx-s.x,s.ty-s.y)<14){const fl=floorY(s.x),sf=surfY(s.x,T);s.tx=s.x+(Math.random()-0.5)*400;s.ty=Math.min(fl-40,Math.max(sf+800,sf+MAKO_DEEP+(Math.random()-0.5)*200));s.tt=8+Math.random()*8;}steer(s,s.tx,s.ty,20,dt,0.75);}}
   for(const e of solo){if(e.onHook){if(fish.st!==4){e.vx+=Math.sin(T*7+(e.ph||0))*60*dt;e.vy+=Math.cos(T*5.2+(e.ph||0))*36*dt;e.vx=Math.max(-100*ROD_SLOW,Math.min(100*ROD_SLOW,e.vx));e.vy=Math.max(-90*ROD_SLOW,Math.min(90*ROD_SLOW,e.vy));if(hookKeys()[1]<0)e.vy=Math.max(0,Math.min(SINK_UP,e.vy));
       e.x+=e.vx*dt;e.y+=e.vy*dt;const sf=surfY(e.x,T)+6,fl=floorY(e.x)-(e.k==='mako'?20:e.k==='dolphin'?12:e.k==='puffer'?8:e.k==='nemo'?5:10);if(e.y<sf){e.y=sf;if(e.vy<0)e.vy=0;}if(e.y>fl){e.y=fl;if(e.vy>0)e.vy=0;}if(e.x<WALLX+16){e.x=WALLX+16;if(e.vx<0)e.vx=0;}
       fish.x=e.x+mouthOx(e);fish.y=e.y;}continue;}
     if(isReef(e.k)){if(e!==DV.ride)stepReefFish(e,dt,T);continue;}
-    const sf=surfY(e.x,T),fl=floorY(e.x),top=e.k==='tuna'?200:e.k==='mako'?MAKO_DEEP:380;if(e.y<sf+top*0.9)e.vy+=(e.k==='mako'?90:30)*dt;if(e.k==='mako'&&e.y<fl-120)e.vy+=55*dt;if(e.y>fl-(e.k==='mako'?24:14))e.vy-=40*dt;if(e.x<WALLX+50)e.vx+=40*dt;
+    const sf=surfY(e.x,T),fl=floorY(e.x),top=e.k==='tuna'?200:e.k==='mako'?MAKO_DEEP:380;if(e.y<sf+top*(e.k==='mako'?0.85:0.9))e.vy+=(e.k==='mako'?90:30)*dt;if(e.k==='mako'&&(e.y>sf+MAKO_DEEP+180||e.y>fl-80))e.vy-=70*dt;if(e.y>fl-(e.k==='mako'?24:14))e.vy-=40*dt;if(e.x<WALLX+50)e.vx+=40*dt;
     if(e.k==='mako'||e.k==='tuna'){const tw=tropLook(e.x);if(tw>0.12){const mid=(TROP0+TROP1)*0.5;e.vx+=(e.x<mid?-1:1)*48*tw*dt;e.vy+=22*tw*dt;}}
     e.x+=e.vx*dt;e.y+=e.vy*dt;if(Math.abs(e.vx)>1)e.face=e.vx>0?1:-1;}
   for(const b of blood){b.l+=dt;b.x+=(b.vx+Math.sin(T*0.4+b.r0*9)*0.6)*dt;b.y+=b.vy*dt;b.vx*=Math.exp(-0.25*dt);b.vy*=Math.exp(-0.2*dt);}
