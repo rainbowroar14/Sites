@@ -239,7 +239,7 @@ function updSchools(dt,T){const c0=Math.floor((cx-250)/500),c1=Math.floor((cx+W+
     const killNear=T<KILL.until&&Math.hypot(mx-KILL.x,my-KILL.y)<140;
     for(const f of s.fish){const cw=(f.fleeT||0)>T?0.15:1;let ax=((mx-f.x)*0.1+(mvx-f.vx)*0.8+(s.tx-mx)*0.05)*cw,ay=((my-f.y)*0.14+(mvy-f.vy)*0.8+(s.ty-my)*0.1)*cw;
       for(const g of s.fish){if(g===f)continue;const dx=f.x-g.x,dy=f.y-g.y,d2=dx*dx+dy*dy;if(d2<110&&d2>0.01){ax+=dx/d2*110;ay+=dy/d2*110;}}
-      if(killNear||(f.fleeT||0)>T){const kx=KILL.x,ky=KILL.y,dx=f.x-kx,dy=f.y-ky,d=Math.hypot(dx,dy)||1;ax+=dx/d*90;ay+=dy/d*70;if(killNear)f.fleeT=T+2.8;}
+      if(killNear||(f.fleeT||0)>T){const kx=KILL.x,ky=KILL.y,dx=f.x-kx,dy=f.y-ky,d=Math.hypot(dx,dy)||1;const[rx,ry]=fleeRot(f,dx,dy,d,T,dt);ax+=rx*90;ay+=ry*70;if(killNear)f.fleeT=T+2.8;}
       const sf=surfY(f.x,T),fl=floorY(f.x);if(f.y<sf+18)ay+=(sf+18-f.y)*3;if(f.y>fl-16)ay-=(f.y-fl+16)*3;if(f.x<WALLX+24)ax+=(WALLX+24-f.x)*3;
       f.vx+=ax*dt;f.vy+=ay*dt;const sp=Math.hypot(f.vx,f.vy);const mn=8,mxs=(f.fleeT||0)>T?44:22;if(sp>mxs){f.vx*=mxs/sp;f.vy*=mxs/sp;}else if(sp<mn&&sp>0){f.vx*=mn/sp;f.vy*=mn/sp;}else if(sp===0)f.vx=-mn;
       f.x+=f.vx*dt;f.y+=f.vy*dt;}}
@@ -252,7 +252,7 @@ function updSchools(dt,T){const c0=Math.floor((cx-250)/500),c1=Math.floor((cx+W+
     for(let i=0;i<n;i++){const [ox,oy]=formOff(s.form,i,n,s.seed);s.fish.push({x:x0+ox,y:y0+oy,ox,oy,ph:hash(c*17+i)*4,i});}}
   for(const [c,s] of sardSchools){if(c<sc0-3||c>sc1+3){sardSchools.delete(c);continue;}if(!s.fish.length)continue;
     let scare=false;if(DV.on){const dC=Math.hypot(s.tx-DV.x,s.ty-DV.y);if(dC<48)scare=true;else{for(const f of s.fish){if(Math.hypot(f.x-DV.x,f.y-DV.y)<42){scare=true;break;}}}
-      if(scare){const dx=s.tx-DV.x,dy=s.ty-DV.y,d=Math.hypot(dx,dy)||1;s.vx+=dx/d*95*dt;s.vy+=dy/d*70*dt;const sp=Math.hypot(s.vx,s.vy);if(sp>48){s.vx*=48/sp;s.vy*=48/sp;}s.fleeT=T+1.4;}}
+      if(scare){const dx=s.tx-DV.x,dy=s.ty-DV.y,d=Math.hypot(dx,dy)||1;const[rx,ry]=fleeRot(s,dx,dy,d,T,dt);s.vx+=rx*95*dt;s.vy+=ry*70*dt;const sp=Math.hypot(s.vx,s.vy);if(sp>48){s.vx*=48/sp;s.vy*=48/sp;}s.fleeT=T+1.4;}}
     s.tx+=s.vx*dt;s.ty+=(s.fleeT||0)>T?s.vy*dt:Math.sin(T*0.35+s.seed)*6*dt;if(!((s.fleeT||0)>T))s.vy=Math.sin(T*0.55+s.seed*2)*4;
     if(s.tx<WALLX+40){s.tx=WALLX+40;s.vx=Math.abs(s.vx);}
     const sf0=surfY(s.tx,T)+20,fl0=floorY(s.tx)-20;if(s.ty<sf0)s.ty=sf0;if(s.ty>fl0)s.ty=fl0;
@@ -260,7 +260,7 @@ function updSchools(dt,T){const c0=Math.floor((cx-250)/500),c1=Math.floor((cx+W+
     for(const f of s.fish){const wig=Math.sin(T*6+f.ph)*0.7,wag=Math.cos(T*5.2+f.ph*1.3)*0.5;
       if(f.vx===undefined){f.vx=s.vx;f.vy=s.vy;}
       const gx=s.tx+f.ox*face+wig,gy=s.ty+f.oy+wag,ex=gx-f.x,ey=gy-f.y,ed=Math.hypot(ex,ey);
-      let fl=false,ax=0,ay=0;if(DV.on){const dx=f.x-DV.x,dy=f.y-DV.y,d=Math.hypot(dx,dy)||1;if(d<50){fl=true;f.fleeT=T+1.6;const k=(1-d/50)*0.6+0.4;ax+=dx/d*260*k;ay+=dy/d*200*k;}}
+      let fl=false,ax=0,ay=0;if(DV.on){const dx=f.x-DV.x,dy=f.y-DV.y,d=Math.hypot(dx,dy)||1;if(d<50){const[rx,ry]=fleeRot(f,dx,dy,d,T,dt);fl=true;f.fleeT=T+1.6;const k=(1-d/50)*0.6+0.4;ax+=rx*260*k;ay+=ry*200*k;}}
       const scared=fl||(f.fleeT||0)>T;if(ed>10)f.loose=true;else if(ed<3)f.loose=false;
       if(!scared){const kp=f.loose?2.2:9,kd=f.loose?1.4:4.5;ax+=ex*kp+(s.vx-f.vx)*kd;ay+=ey*kp+(s.vy-f.vy)*kd;}else{ax+=(s.vx-f.vx)*0.3;ay+=(s.vy-f.vy)*0.3;}
       const sfY=surfY(f.x,T),flY=floorY(f.x);if(f.y<sfY+6)ay+=(sfY+6-f.y)*6;if(f.y>flY-6)ay-=(f.y-flY+6)*6;if(f.x<WALLX+10)ax+=(WALLX+10-f.x)*6;
@@ -495,7 +495,8 @@ const F={B:"110101110101110",G:"111100101101111",J:"001001001101111",K:"10110111
 "0":"111101101101111","1":"010110010010111","2":"111001111100111","3":"111001111001111","4":"101101111001001","5":"111100111001111","6":"111100111101111","7":"111001001001001","8":"111101111101111","9":"111101111001111"," ":"000000000000000",S:"111100111001111",A:"010101111101101",I:"111010010010111",R:"110101110101101",F:"111100110100100",U:"101101101101111",L:"100100100100111",C:"111100100100111",N:"110101101101101",O:"111101101101111",W:"101101101111101",Y:"101101010010010","[":"110100100100110","]":"011001001001011"};
 function text(s,x,y,c){for(const ch of s){const g=F[ch]||F[" "];for(let i=0;i<15;i++)if(g[i]=="1")put(x+i%3,y+(i/3|0),c);x+=4;}}
 function text2x(s,x,y,c){for(const ch of s){const g=F[ch]||F[" "];for(let i=0;i<15;i++)if(g[i]=="1"){const px=x+(i%3)*2,py=y+(i/3|0)*2;put(px,py,c);put(px+1,py,c);put(px,py+1,c);put(px+1,py+1,c);}x+=8;}}
-const VER="V5";
+function fleeRot(o,dx,dy,d,T,dt){if(!((o.fleeT||0)>T)||o.fa===undefined){o.fa=(Math.random()*2-1)*0.175;o.ft=0;}o.ft=Math.max(-0.175,Math.min(0.175,(o.ft||0)+(Math.random()*2-1)*0.6*dt));const a=o.fa+o.ft,c=Math.cos(a),n=Math.sin(a),ux=dx/d,uy=dy/d;return[ux*c-uy*n,ux*n+uy*c];}
+const VER="V6";
 function textA(s,x,y,c,a){for(const ch of s){const g=F[ch]||F[" "];for(let i=0;i<15;i++)if(g[i]=="1"){const px=x+(i%3),py=y+(i/3|0);if(px>=0&&px<W&&py>=0&&py<H){const dst=buf[py*W+px],src=P32[c],dr=dst&255,dg=(dst>>8)&255,db=(dst>>16)&255,sr=src&255,sg=(src>>8)&255,sb=(src>>16)&255;const r=(dr+(sr-dr)*a)|0,g2=(dg+(sg-dg)*a)|0,b=(db+(sb-db)*a)|0;buf[py*W+px]=0xff000000|(b<<16)|(g2<<8)|r;}}x+=4;}}
 function drawVer(){const s=VER;textA(s,W-2-s.length*4,H-7,10,0.5);}
 const FD={" ":"00000000000000000000000000000000000",A:"01110100011000111111100011000110001",B:"11110100011000111110100011000111110",C:"01111100001000010000100001000001111",D:"11110100011000110001100011000111110",E:"11111100001000011110100001000011111",F:"11111100001000011110100001000010000",G:"01111100001000010111100011000101110",H:"10001100011000111111100011000110001",I:"11111001000010000100001000010011111",J:"00111000100001000010000101001001100",K:"10001100101010011000101001001010001",L:"10000100001000010000100001000011111",M:"10001110111010110101100011000110001",N:"10001110011010110011100011000110001",O:"01110100011000110001100011000101110",P:"11110100011000111110100001000010000",Q:"01110100011000110001101011001001101",R:"11110100011000111110101001001010001",S:"01111100001000001110000010000111110",T:"11111001000010000100001000010000100",U:"10001100011000110001100011000101110",V:"10001100011000110001100010101000100",W:"10001100011000110101101011010101010",X:"10001100010101000100010101000110001",Y:"10001100010101000100001000010000100",Z:"11111000010001000100010001000011111","0":"01110100011001110101110011000101110","1":"00100011000010000100001000010001110","2":"01110100010000100010001000100011111","3":"11110000010000101110000010000111110","4":"10001100011000111111000010000100001","5":"11111100001000011110000010000111110","6":"01110100001000011110100011000101110","7":"11111000010001000100010000100001000","8":"01110100011000101110100011000101110","9":"01110100011000101111000010000101110","!":"00100001000010000100001000000000100",".":"00000000000000000000000000000000100",",":"00000000000000000000000000010001000","?":"01110100010000100010001000000000100","'":"00100001000000000000000000000000000","-":"00000000000000011111000000000000000","/":"00001000100001000100010000100010000","[":"01110010000100001000010000100001110","]":"01110000100001000010000100001001110","%":"11001110100001000100010000101110011",":":"00000001000000000000000000010000000"};
