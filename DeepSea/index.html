@@ -303,10 +303,16 @@ function soloSpawn(){const c0=Math.floor((cx-300)/400),c1=Math.floor((cx+W+300)/
     if(tw>0.92)continue;
     const ocean=1-tw;
     if(hash(c*53+1)<0.55*ocean)solo.push({k:'tuna',c,x:x0,y:220+hash(c*53+2)*180,vx:-10,vy:0,ph:hash(c*53+3)*4,tx:x0,ty:300,tt:0});
-    if(hash(c*71+5)<0.3*ocean){const fl=floorY(x0);solo.push({k:'mako',c,x:x0+90,y:Math.min(fl-40,400+hash(c*71+6)*500),vx:18,vy:0,ph:hash(c*71+7)*4,tx:x0,ty:500,tt:0,cool:0,hp:5,maxhp:5});}}
+    if(hash(c*71+5)<0.3*ocean){const fl=floorY(x0);solo.push({k:'mako',c,x:x0+90,y:Math.min(fl-40,400+hash(c*71+6)*500),vx:18,vy:0,ph:hash(c*71+7)*4,tx:x0,ty:500,tt:0,cool:0,hp:5,maxhp:5,knowT:0,mode:'patrol',fleeX:0,fleeY:0,fleeUntil:0,atkCd:0});}}
   solo=solo.filter(e=>{if(e.onHook)return true;const keep=e.x>cx-1400&&e.x<cx+W+1400;if(!keep)soloC.delete(e.c);return keep;});}
 function steer(e,tx,ty,sp,dt,acc){const dx=tx-e.x,dy=ty-e.y,d=Math.hypot(dx,dy)||1;e.vx+=(dx/d*sp-e.vx)*Math.min(1,acc*dt);e.vy+=(dy/d*sp-e.vy)*Math.min(1,acc*dt);}
 function bleed(x,y,n){for(let i=0;i<n&&blood.length<240;i++)blood.push({x:x+(Math.random()-0.5)*6,y:y+(Math.random()-0.5)*5,vx:(Math.random()-0.5)*3,vy:-0.3-Math.random()*0.9,r0:1.5+Math.random()*1,l:0,m:8+Math.random()*4});}
+const MAKO_FOV=Math.PI/2,MAKO_SIGHT=210,MAKO_SMELL=280,MAKO_MEM=10,MAKO_BITE=14,MAKO_ATKCD=1.2,MAKO_FLEE_TO=5,MAKO_LEASH=W*1.5;
+function makoHead(s){const sp=Math.hypot(s.vx||0,s.vy||0);return sp>2?Math.atan2(s.vy,s.vx):(s.face||1)>0?0:Math.PI;}
+function makoSees(s,tx,ty,rng){const dx=tx-s.x,dy=ty-s.y,d=Math.hypot(dx,dy);if(d>(rng||MAKO_SIGHT))return false;let da=Math.atan2(dy,dx)-makoHead(s);da=Math.atan2(Math.sin(da),Math.cos(da));return Math.abs(da)<=MAKO_FOV*0.5;}
+function makoSmellBlood(s){for(const b of blood){if(Math.hypot(b.x-s.x,b.y-s.y)<MAKO_SMELL)return b;}return null;}
+function makoOffscreenFlee(s,T){const side=Math.random()<0.5?-1:1;let dist=150+Math.random()*130,fx=s.x+side*dist;if(fx>=cx-40&&fx<=cx+W+40)fx=side<0?cx-50-Math.random()*20:cx+W+50+Math.random()*20;if(Math.abs(fx-s.x)>280)fx=s.x+Math.sign(fx-s.x)*280;if(Math.abs(fx-s.x)<150)fx=s.x+Math.sign(fx-s.x||side)*150;const yLo=surfY(fx,T)+20,yHi=Math.max(yLo+8,floorY(fx)-30);return{x:fx,y:Math.max(yLo,Math.min(yHi,s.y+(Math.random()-0.5)*90))};}
+function makoMouth(s){const face=Math.abs(s.vx||0)>1?(s.vx>0?1:-1):(s.face||-1);return[s.x+face*29,s.y+4];}
 function updSea(dt,T){soloSpawn();
   const sharks=solo.filter(e=>e.k==='mako'),tunas=solo.filter(e=>e.k==='tuna');
   for(const e of tunas){if(e.onHook)continue;let fx=0,fy=0,threat=null,td=1e9;
@@ -315,20 +321,33 @@ function updSea(dt,T){soloSpawn();
     e.flee=!!threat;
     if(threat){const dx=e.x-threat.x,dy=e.y-threat.y,d=Math.hypot(dx,dy)||1;steer(e,e.x+dx/d*50,e.y+dy/d*50*0.6,(e.fleeT||0)>T?36:20,dt,3);}
     else{e.tt-=dt;if(e.tt<=0||Math.hypot(e.tx-e.x,e.ty-e.y)<10){e.tx=e.x+(Math.random()-0.5)*260;e.ty=220+Math.random()*180;e.tt=6+Math.random()*6;}steer(e,e.tx,e.ty,10,dt,1);}}
-  for(const s of sharks){if(s.onHook)continue;s.cool=Math.max(0,s.cool-dt);
+  for(const s of sharks){if(s.onHook)continue;s.cool=Math.max(0,s.cool-dt);s.atkCd=Math.max(0,(s.atkCd||0)-dt);if(s.knowT===undefined)s.knowT=0;if(!s.mode)s.mode='patrol';
     if(s.held){s.vx*=Math.exp(-1.5*dt);s.vy*=Math.exp(-1.5*dt);const mx=s.x+(s.vx>0?1:-1)*0+(s.face||-1)*29,my=s.y+4;
       if(T>=s.held.next){s.held.bites++;bleed(mx,my,7);s.held.next=T+1+Math.random();
         if(s.held.bites>=s.held.max){for(let i=0;i<3;i++)bones.push({x:mx+(i-1)*4,y:my,kind:i,vx:(Math.random()-0.5)*6,l:0,rest:false});s.held=null;s.cool=6;}}
       continue;}
     s.chase=null;
-    if(DV.on&&(s.fleeT||0)>T){const dx=s.x-DV.x,dy=s.y-DV.y,d=Math.hypot(dx,dy)||1;steer(s,s.x+dx/d*80,s.y+dy/d*40,70,dt,3);continue;}
-    if(!s.cool){const hd=Math.atan2(s.vy,s.vx);let best=null,bd=150;
-      for(const e of tunas){const dx=e.x-s.x,dy=e.y-s.y,d=Math.hypot(dx,dy);if(d>bd)continue;let da=Math.atan2(dy,dx)-hd;da=Math.atan2(Math.sin(da),Math.cos(da));if(Math.abs(da)<0.57){bd=d;best=e;}}
+    // off-screen flee (low-HP after bite, or spear when hp<=2)
+    if(s.mode==='flee'){steer(s,s.fleeX,s.fleeY,74,dt,3.2);if(Math.hypot((s.fleeX||0)-s.x,(s.fleeY||0)-s.y)<18||T>=(s.fleeUntil||0)){s.mode='hunt';s.fleeT=0;}continue;}
+    // brief healthy flinch (short fleeT) — swim off then resume hunt
+    if((s.fleeT||0)>T){if(DV.on){const dx=s.x-DV.x,dy=s.y-DV.y,d=Math.hypot(dx,dy)||1;steer(s,s.x+dx/d*60,s.y+dy/d*30,55,dt,2.5);}else{s.tt=0;}continue;}
+    const smell=makoSmellBlood(s);
+    const dP=DV.on?Math.hypot(DV.x-s.x,DV.y-s.y):1e9;
+    const knows=(s.knowT||0)>T&&dP<MAKO_LEASH;
+    const sees=DV.on&&makoSees(s,DV.x,DV.y,MAKO_SIGHT);
+    const aware=DV.on&&(knows||sees||!!smell);
+    if(aware){s.mode='hunt';steer(s,DV.x,DV.y,(s.hp||5)<=2?50:54,dt,3.1);const[mx,my]=makoMouth(s);
+      if((s.atkCd||0)<=0&&Math.hypot(DV.x-mx,DV.y-my)<MAKO_BITE){hurt(T);const dx=DV.x-s.x,dy=DV.y-s.y,d=Math.hypot(dx,dy)||1;DV.vx+=dx/d*55;DV.vy+=dy/d*42;bleed(mx,my,6);cageMsg(PHP.hp>1?'SHARK BITE! -1 HP':'SHARK BITE!',T,1.4);s.knowT=T+MAKO_MEM;s.atkCd=MAKO_ATKCD;playDrop(2.2,0.45);
+        if((s.hp||5)<=2){const p=makoOffscreenFlee(s,T);s.mode='flee';s.fleeX=p.x;s.fleeY=p.y;s.fleeUntil=T+MAKO_FLEE_TO;s.fleeT=0;}}
+      continue;}
+    if(smell){steer(s,smell.x,smell.y,36,dt,2.2);continue;}
+    if(!s.cool){let best=null,bd=MAKO_SIGHT;
+      for(const e of tunas){if(e.onHook||!makoSees(s,e.x,e.y,MAKO_SIGHT))continue;const d=Math.hypot(e.x-s.x,e.y-s.y);if(d<bd){bd=d;best=e;}}
       s.chase=best;}
     if(s.chase&&s.chase.onHook)s.chase=null;
-    if(s.chase){steer(s,s.chase.x,s.chase.y,40,dt,2.8);const mx=s.x+Math.sign(s.vx||-1)*29,my=s.y+4;
+    if(s.chase){s.mode='patrol';steer(s,s.chase.x,s.chase.y,40,dt,2.8);const[mx,my]=makoMouth(s);
       if(Math.hypot(s.chase.x-mx,s.chase.y-my)<12){solo=solo.filter(e=>e!==s.chase);s.held={bites:0,max:3+Math.floor(Math.random()*2),next:T+1+Math.random()};s.chase=null;bleed(mx,my,10);}}
-    else{s.tt-=dt;if(s.tt<=0||Math.hypot(s.tx-s.x,s.ty-s.y)<14){const fl=floorY(s.x);s.tx=s.x+(Math.random()-0.5)*400;s.ty=Math.min(fl-40,400+Math.random()*500);s.tt=8+Math.random()*8;}steer(s,s.tx,s.ty,20,dt,0.75);}}
+    else{s.mode='patrol';s.tt-=dt;if(s.tt<=0||Math.hypot(s.tx-s.x,s.ty-s.y)<14){const fl=floorY(s.x);s.tx=s.x+(Math.random()-0.5)*400;s.ty=Math.min(fl-40,400+Math.random()*500);s.tt=8+Math.random()*8;}steer(s,s.tx,s.ty,20,dt,0.75);}}
   for(const e of solo){if(e.onHook){if(fish.st!==4){e.vx+=Math.sin(T*7+(e.ph||0))*60*dt;e.vy+=Math.cos(T*5.2+(e.ph||0))*36*dt;e.vx=Math.max(-100*ROD_SLOW,Math.min(100*ROD_SLOW,e.vx));e.vy=Math.max(-90*ROD_SLOW,Math.min(90*ROD_SLOW,e.vy));if(hookKeys()[1]<0)e.vy=Math.max(0,Math.min(SINK_UP,e.vy));
       e.x+=e.vx*dt;e.y+=e.vy*dt;const sf=surfY(e.x,T)+6,fl=floorY(e.x)-(e.k==='mako'?20:e.k==='dolphin'?12:e.k==='puffer'?8:e.k==='nemo'?5:10);if(e.y<sf){e.y=sf;if(e.vy<0)e.vy=0;}if(e.y>fl){e.y=fl;if(e.vy>0)e.vy=0;}if(e.x<WALLX+16){e.x=WALLX+16;if(e.vx<0)e.vx=0;}
       fish.x=e.x+mouthOx(e);fish.y=e.y;}continue;}
@@ -587,7 +606,7 @@ function releaseFish(f,x,y){if(f.k==='jelly'){jel.push({x,y,hx:x,hy:y,ph:Math.ra
   if(f.k==='mcrab'){crabs.push({c:-999,g:false,x,dir:1,tt:3,walk:true,hideT:T+2,ph:0});return;}
   if(f.k==='crab'||f.k==='gcrab'){crabs.push({c:-999,g:f.k==='gcrab',x,dir:1,tt:3,walk:true,hideT:T+3,ph:0});return;}const d=Math.random()<0.5?-1:1;if(f.k==='student'){const c=Math.floor(x/500);let s=schools.get(c);if(!s){s={c,fish:[],tx:x,ty:y,seed:0};schools.set(c,s);}if(s.seed===undefined){s.tx=x;s.ty=y;s.seed=0;}s.fish.push({x,y,vx:d*15,vy:0,ph:Math.random()*4});}else if(f.k==='sardine'){const c=Math.floor(x/420);let s=sardSchools.get(c);if(!s){s={c,fish:[],tx:x,ty:y,seed:0,form:0,vx:d*16,vy:0};sardSchools.set(c,s);}s.fish.push({x,y,ox:0,oy:0,vx:d*16,vy:0,ph:Math.random()*4,i:s.fish.length});}
   else if(f.k==='seagull'){gulls.push({st:'loot',g:-999,x,y,bx:0,by:0,vx:d*12,vy:6,ph:Math.random()*4,face:d,spin:0});}
-  else solo.push(Object.assign({k:f.k,c:-999,x,y,vx:d*20,vy:0,ph:Math.random()*4,tx:x+d*250,ty:y,tt:8,cool:6},f.k==='dolphin'?{hp:4,maxhp:4}:f.k==='mako'?{hp:5,maxhp:5}:null));}
+  else solo.push(Object.assign({k:f.k,c:-999,x,y,vx:d*20,vy:0,ph:Math.random()*4,tx:x+d*250,ty:y,tt:8,cool:6},f.k==='dolphin'?{hp:4,maxhp:4}:f.k==='mako'?{hp:5,maxhp:5,knowT:0,mode:'patrol',fleeX:0,fleeY:0,fleeUntil:0,atkCd:0}:null));}
 const FSPR=k=>k==='student'?[SARD,SARDC]:k==='sardine'?[SARDINE,SARDINEC]:k==='tuna'?[TUNA,TUNAC]:k==='nemo'?[NEMO,NEMOC]:k==='puffer'?[PUFFER,PUFFC]:k==='dolphin'?[DOLPHIN,DOLPHC]:k==='seagull'?[SEAGULL,SEAGULLC]:k==='crab'?[HSM_S,HERMC]:k==='gcrab'?[HGI_S,HGIC]:k==='mcrab'?[MCRAB,MCRABC]:k==='jelly'?[JLS,JLC]:k==='king'?[GJS,GJC]:k==='cage'?[CG,CGC]:[MAKO,MAKOC];
 function ropeAt(s){const k=Math.max(0,s/RL),i=Math.min(RN-2,Math.floor(k)),f=Math.min(1,k-i),a=ROPE[i],b=ROPE[i+1];return [a.x+(b.x-a.x)*f,a.y+(b.y-a.y)*f];}
 function cargoSpan(k){if(k==='sardine')return 3;if(k==='nemo')return 8;if(k==='puffer')return 9;if(k==='dolphin')return 24;if(k==='seagull')return 12;return FSPR(k)[0].frames[0][0].length;}
@@ -618,7 +637,7 @@ function skewer(T){const tx=SPR.x,ty=SPR.y;const kingLoad=hasKing()||SPR.fish.so
   if(!kingLoad)for(const [,s] of schools)for(let i=s.fish.length-1;i>=0;i--){const f=s.fish[i];if(Math.hypot(f.x-tx,f.y-ty)<5){s.fish.splice(i,1);SPR.fish.push({k:'student',ph:Math.random()*4});bleed(tx,ty,3);}}
   if(!kingLoad)for(const [,s] of sardSchools)for(let i=s.fish.length-1;i>=0;i--){const f=s.fish[i];if(Math.hypot(f.x-tx,f.y-ty)<3.5){s.fish.splice(i,1);SPR.fish.push({k:'sardine',ph:Math.random()*4});if(Math.random()<0.35)bleed(tx,ty,1);}}
   if(!kingLoad)for(let i=solo.length-1;i>=0;i--){const e=solo[i];if(e.onHook||e===DV.ride)continue;const r=e.k==='nemo'?6:e.k==='puffer'?7:e.k==='dolphin'?12:e.k==='tuna'?10:15;if(Math.hypot(e.x-tx,e.y-ty)<r){if(SPR.hit.has(e))continue;SPR.hit.add(e);const mh=soloMaxHp(e.k);if(e.maxhp===undefined)e.maxhp=mh;if(e.hp===undefined)e.hp=e.maxhp;e.hp--;e.hpShow=T+3;
-    if(e.hp>0){bleed(tx,ty,3);e.flash=T+0.15;e.vx+=Math.cos(SPR.ang)*45;e.vy+=Math.sin(SPR.ang)*45;e.fleeT=T+(e.k==='mako'?6+Math.random()*2:5);SPR.vx*=-0.25;SPR.vy*=-0.25;continue;}solo.splice(i,1);for(const s of solo)if(s.chase===e)s.chase=null;SPR.fish.push({k:e.k,ph:Math.random()*4});bleed(tx,ty,8);}}
+    if(e.hp>0){bleed(tx,ty,3);e.flash=T+0.15;e.vx+=Math.cos(SPR.ang)*45;e.vy+=Math.sin(SPR.ang)*45;if(e.k==='mako'){if(e.hp<=2){const p=makoOffscreenFlee(e,T);e.mode='flee';e.fleeX=p.x;e.fleeY=p.y;e.fleeUntil=T+MAKO_FLEE_TO;e.fleeT=0;}else{e.cool=Math.max(e.cool||0,1);e.fleeT=T+1.2;e.mode=e.mode==='flee'?'hunt':(e.mode||'hunt');}}else e.fleeT=T+5;SPR.vx*=-0.25;SPR.vy*=-0.25;continue;}solo.splice(i,1);for(const s of solo)if(s.chase===e)s.chase=null;SPR.fish.push({k:e.k,ph:Math.random()*4});bleed(tx,ty,8);}}
   if(!kingLoad)for(let i=gulls.length-1;i>=0;i--){const g=gulls[i];if(SPR.hit.has(g))continue;if(Math.hypot(g.x-tx,g.y-ty)>(g.st==='fly'?12:10))continue;SPR.hit.add(g);
     if(g.st==='fly'){gullHit(g,T,[Math.cos(SPR.ang)*30,Math.sin(SPR.ang)*30+10]);SPR.vx*=-0.2;SPR.vy*=-0.2;continue;}
     if(g.st==='loot'){gulls.splice(i,1);SPR.fish.push({k:'seagull',ph:Math.random()*4});bleed(tx,ty,4);}}}
