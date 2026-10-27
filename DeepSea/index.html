@@ -144,7 +144,7 @@ function physics(dt,T){
 }
 // ---- fishing: 0 idle, 1 flick, 2 flying, 3 sinking/resting, 4 reeling
 const fish={st:0,t:0,x:0,y:0,vx:0,vy:0,rod:0,load:[],stick:null,tick:0};let rodTip=[0,0];
-const ROD_CAP=10;let CAP=5;const FW8={student:1,sardine:1,tuna:2,mako:5,crab:1,gcrab:1,mcrab:1,jelly:1,king:5,cage:2,nemo:1,puffer:2,dolphin:4};const fw=k=>k==='king'?CAP:(FW8[k]||1);
+const ROD_CAP=10;let CAP=5;const FW8={student:1,sardine:1/3,tuna:2,mako:5,crab:1,gcrab:1,mcrab:1,jelly:1,king:5,cage:2,nemo:1,puffer:2,dolphin:4,seagull:1};const fw=k=>k==='king'?CAP:(FW8[k]||1);
 function hookKeys(){return [(keys.KeyD||keys.ArrowRight?1:0)-(keys.KeyA||keys.ArrowLeft?1:0),(keys.KeyS||keys.ArrowDown?1:0)-(keys.KeyW||keys.ArrowUp?1:0)];}
 function rodW(){let w=0;for(const f of fish.load)w+=fw(f.k||'student');return w;}
 function rodFit(k){return rodW()+fw(k)<=ROD_CAP;}
@@ -183,6 +183,45 @@ function updFish(dt,T){fish.t+=dt;
 // ---- student schools (boids, larger former-sardine), seeded per 500px chunk
 const SARD={"pal": ["#a89a4a", "#1c2a24", "#4e6a52", "#93a88a", "#dfe4c8"], "frames": [["......00...", "...11222110", ".1123232100", "13333333300", ".144444441.", "...10....0."], ["......00.10", "...11222100", ".1123232100", "1333333331.", ".144444440.", "...1......."], ["......00...", "...11222110", ".1123232100", "13333333300", ".144444441.", "...1...0.0."], ["......00...", "...112221..", ".1123232110", "13333333300", ".1444444400", "...10..0.1."]]};const SARDC=SARD.pal.map(h=>{const n=parseInt(h.slice(1),16);return [n>>16,(n>>8)&255,n&255];});
 const SARDINE={"pal": ["#8fbc8f", "#1a2e24", "#d4e8d0"], "frames": [[".01", "102"], [".01", "120"], ["01.", "201"], ["01.", "021"]]};const SARDINEC=SARDINE.pal.map(h=>{const n=parseInt(h.slice(1),16);return [n>>16,(n>>8)&255,n&255];});
+
+// ---- seagulls (sky flocks: solo/pair/trio; midair hit → fall → loot worth 30)
+const SEAGULL={"pal":["#2A2E42","#3A4255","#8A97A8","#B6C2D0","#F2F4F7","#E9A63A","#C45A2A"],"frames":[["................01140.......",".........00....022110.......","........011...022200........",".......0210..02230..........","......0222..02230.000.......","......222...22300044400.....",".......00000220044304455550.","....000444424444444444555660","..0044444444444444440000000.",".04444444444444000..........","043444434343433.............",".00333433333300.............","...0003000600...............","......0...0.................","............................"],["...................000......","...............00001140.....","..............022221110.....",".....00......022233000......","...1022.....02223004400.....","...022200000222244304455550.","..02200444444444444444555660","..0044444442444444440000000.",".04444444443444000..........","043444434343433.............",".00333433333300.............","...0003000600...............","......0...0.................","............................","............................"],["............................","............................","............................","............................","..................000.......","................0044400.....",".......00000000044304455550.","....000444442220444444555660","..0044444444223204440000000.",".04444444444022320..........","043022434343402232..........",".0030223333330022300........","...0002200600..022310.......","......021.0.....01140.......",".......10........000........"],["..............00.1140.......",".............02221110.......","......10....02233.00........",".....022...02232.0000.......","....0222...222200044400.....","...022.00000000044304455550.","....000444424444444444555660","..0044444444444444440000000.",".04444444444444000..........","043444434343433.............",".00333433333300.............","...0003000600...............","......0...0.................","............................","............................"]]};const SEAGULLC=SEAGULL.pal.map(h=>{const n=parseInt(h.slice(1),16);return [n>>16,(n>>8)&255,n&255];});
+let gulls=[],gullC=new Set();
+function gullHit(g,T,kick){if(g.st!=='fly')return;g.st='fall';g.spin=(Math.random()<0.5?-1:1)*(6+Math.random()*5);g.vx=(g.vx||0)*0.35+(kick?kick[0]:0);g.vy=(kick&&kick[1]!==undefined?kick[1]:18)+Math.random()*10;bleed(g.x,g.y,4);cageMsg('SEAGULL HIT!',T,1.2);}
+function gullSpawn(){const c0=Math.floor((cx-400)/520),c1=Math.floor((cx+W+400)/520);
+  for(let c=c0;c<=c1;c++){if(gullC.has(c))continue;gullC.add(c);const x0=c*520+260;if(x0<WALLX+80)continue;
+    // occasional flocks across ocean + reef (~35% of chunks)
+    if(hash(c*91+3)>0.35)continue;
+    const n=hash(c*91+4)<0.45?1:(hash(c*91+5)<0.55?2:3),dir=hash(c*91+6)<0.5?-1:1,spd=38+hash(c*91+7)*28;
+    const baseY=-90-hash(c*91+8)*50; // high above surf (~surfY≈0 band)
+    for(let i=0;i<n;i++){const ox=(i-(n-1)/2)*18+hash(c*91+9+i)*6-3,oy=(i?((i%2)?-6:5):0)+hash(c*91+11+i)*4-2;
+      gulls.push({st:'fly',g:c,x:x0+ox,y:baseY+oy,bx:ox,by:oy,vx:dir*spd,vy:0,ph:hash(c*91+13+i)*4,face:dir,spin:0});}}
+  gulls=gulls.filter(g=>{if(g.st!=='fly')return true;return g.x>cx-1600&&g.x<cx+W+1600;});
+  // free chunk seeds only when no fly members of that chunk remain
+  const live=new Set(gulls.filter(g=>g.st==='fly').map(g=>g.g));for(const c of [...gullC])if(!live.has(c))gullC.delete(c);}
+function updGulls(dt,T){gullSpawn();
+  // boat jump / diver hop midair hits
+  if(B.air){for(const g of gulls){if(g.st!=='fly')continue;if(Math.hypot(g.x-B.x,g.y-B.y)<20)gullHit(g,T,[B.vx*0.3,Math.max(12,B.vy*0.4)]);}}
+  if(DV.on&&(DV.hop>0||DV.y<surfY(DV.x,T)-6)){for(const g of gulls){if(g.st!=='fly')continue;if(Math.hypot(g.x-DV.x,g.y-DV.y)<16)gullHit(g,T,[DV.vx*0.25,14]);}}
+  for(const g of gulls){
+    if(g.st==='fly'){g.x+=g.vx*dt;g.y+=Math.sin(T*2.2+g.ph)*6*dt;g.face=g.vx>=0?1:-1;
+      // soft formation: drift toward group centroid offset
+      let n=0,cx0=0,cy0=0;for(const o of gulls){if(o.g===g.g&&o.st==='fly'){cx0+=o.x-o.bx;cy0+=o.y-o.by;n++;}}
+      if(n>1){cx0/=n;cy0/=n;const tx=cx0+g.bx,ty=cy0+g.by;g.x+=(tx-g.x)*Math.min(1,1.6*dt);g.y+=(ty-g.y)*Math.min(1,1.2*dt);}
+      continue;}
+    if(g.st==='fall'){g.vy+=140*dt;g.vx*=Math.exp(-0.4*dt);g.x+=g.vx*dt;g.y+=g.vy*dt;g.spin*=Math.exp(-0.3*dt);
+      const sf=surfY(g.x,T);if(g.y>=sf+2){g.st='loot';g.y=sf+4;g.vy=8;g.vx*=0.4;g.spin*=0.2;splash(g.x,sf,16,0.7);bleed(g.x,g.y,3);}continue;}
+    if(g.st==='loot'){const sf=surfY(g.x,T);g.vy=Math.min(g.vy+20*dt,22);g.vx*=Math.exp(-1.2*dt);g.x+=g.vx*dt;g.y+=g.vy*dt;
+      if(g.y<sf+3){g.y=sf+3;if(g.vy<0)g.vy=0;}const fl=floorY(g.x)-6;if(g.y>fl){g.y=fl;g.vy=0;}
+      if(g.x<WALLX+10){g.x=WALLX+10;g.vx=0;}}}
+  // prune far loot
+  gulls=gulls.filter(g=>g.st==='fly'||(g.x>cx-900&&g.x<cx+W+900));}
+function drawGulls(T){for(const g of gulls){const X=Math.round(g.x-cx),Y=Math.round(g.y-cy);if(X<-40||X>W+40||Y<-40||Y>H+40)continue;
+    const fr=SEAGULL.frames[g.st==='fly'?((Math.floor(T*1000/120+g.ph*4)%4)+4)%4:0];
+    const flip=g.face>0;let ang=0;if(g.st==='fall')ang=T*g.spin;else if(g.st==='loot')ang=Math.sin(T*3+g.ph)*0.35+(g.face>0?0:Math.PI);
+    // air birds: no underwater tint (tm=0)
+    drawRot(fr,SEAGULLC,X,Y,flip,ang,T,0);}}
+
 // ---- student schools (boids, former sardines) + tiny sardine formation schools
 const schools=new Map();const sardSchools=new Map();
 function formOff(form,i,n,seed){const t=i/(n||1);if(form===0){const a=i*2.399963+seed,rad=Math.sqrt((i+0.5)/(n||1))*11.2;return [Math.cos(a)*rad*1.15,Math.sin(a)*rad*0.85];}if(form===1){const a=t*Math.PI*2+seed,rad=9.4+((i%3))*1.3;return [Math.cos(a)*rad*1.2,Math.sin(a)*rad];}const a=t*Math.PI*2+seed*1.3,rad=5.8+((i%4))*2.0;return [Math.cos(a)*rad*1.45,Math.sin(a)*rad*0.9];}
@@ -244,12 +283,14 @@ function tryCatch(T){
     if(!rodFit('student')){rodFullMsg(T);return;}s.fish.splice(i,1);secureCatch('student',T);for(let k=0;k<6;k++)spawn(fish.x+(Math.random()-0.5)*4,fish.y,(Math.random()-0.5)*8,-8,0.8+Math.random()*0.6,2);return;}}
   for(const [,s] of sardSchools)for(let i=0;i<s.fish.length;i++){const f=s.fish[i];if(Math.abs(f.x-fish.x)<4&&Math.abs(f.y-fish.y)<3){
     if(!rodFit('sardine')){rodFullMsg(T);return;}s.fish.splice(i,1);secureCatch('sardine',T);for(let k=0;k<3;k++)spawn(fish.x+(Math.random()-0.5)*3,fish.y,(Math.random()-0.5)*6,-6,0.5+Math.random()*0.4,2);return;}}
+  for(let i=gulls.length-1;i>=0;i--){const g=gulls[i];if(g.st!=='loot'||Math.hypot(g.x-fish.x,g.y-fish.y)>=10)continue;if(!rodFit('seagull')){heavy=true;continue;}gulls.splice(i,1);secureCatch('seagull',T);bleed(fish.x,fish.y,3);return;}
   if(heavy)rodFullMsg(T);}
 const WORM=[[".32.","1..2",".21."],[".23.","2..1",".12."]],WORMC=[0,"#5a2a2e","#b0605a","#e0988a"];const WORMP=WORMC.map(h=>h?(()=>{const n=parseInt(h.slice(1),16);return 0xff000000|((n&255)<<16)|(n&0xff00)|(n>>16);})():0);
 function drawHookBait(hx,hy,T){
   if(!fish.load.length){const w=WORM[((Math.floor(T*3)%2)+2)%2];for(let j=0;j<3;j++)for(let i=0;i<4;i++){const ch=w[j][i];if(ch==='.')continue;const X=hx-1+i,Y=hy+2+j;if(X>=0&&X<W&&Y>=0&&Y<H)buf[Y*W+X]=WORMP[+ch];}return;}
   let off=0;for(let n=0;n<fish.load.length;n++){const c=fish.load[n],yy=hy+2+off;
     if(c.k==='sardine'){const jx=Math.round(Math.sin(T*11+n*1.7)*1.2);drawSardine(SARDINE.frames[((Math.floor(T*14+n)%4)+4)%4],hx+jx,yy,false,T,true,SARDINEC);off+=4;continue;}
+    if(c.k==='seagull'){const sw=Math.sin(T*9+n)*0.2;drawRot(SEAGULL.frames[0],SEAGULLC,hx+1,yy+4,false,Math.PI/2+sw,T,0);off+=10;continue;}
     if(c.k){const sw=Math.sin(T*9+n)*0.25;if(isReef(c.k)){if(!drawReefCarry(c.k,hx+1,yy+4,false,Math.PI/2+sw,T,reefSc(c.k,"carry"),n)){const [S,PC]=FSPR(c.k);drawRot(S.frames[0],PC,hx+1,yy+4,false,Math.PI/2+sw,T);}off+=c.k==="dolphin"?16:6;continue;}const [S,PC]=FSPR(c.k),w=S.frames[0][0].length;drawRot(S.frames[((Math.floor(T*12+n)%4)+4)%4],PC,hx+1-Math.sin(sw)*w/2,yy+Math.cos(sw)*w/2,false,Math.PI/2+sw,T);off+=c.k==='mako'||c.k==='king'?16:12;}
     else{const th=Math.round(Math.sin(T*15+n)*1.2);drawSardine(SARD.frames[((Math.floor(T*14+n)%4)+4)%4],hx+1+th,yy,false,T,true);off+=7;}}}
 // ---- solo fish: tuna (22-40m, wandering) and mako sharks (40m+, patrol, hunt tuna)
@@ -545,10 +586,11 @@ function releaseFish(f,x,y){if(f.k==='jelly'){jel.push({x,y,hx:x,hy:y,ph:Math.ra
   if(f.k==='king'){freeKing.push({x,y,vx:0,vy:10,soft:f.soft||makeSoft(x,y),tents:f.tents||null,life:60});return;}
   if(f.k==='mcrab'){crabs.push({c:-999,g:false,x,dir:1,tt:3,walk:true,hideT:T+2,ph:0});return;}
   if(f.k==='crab'||f.k==='gcrab'){crabs.push({c:-999,g:f.k==='gcrab',x,dir:1,tt:3,walk:true,hideT:T+3,ph:0});return;}const d=Math.random()<0.5?-1:1;if(f.k==='student'){const c=Math.floor(x/500);let s=schools.get(c);if(!s){s={c,fish:[],tx:x,ty:y,seed:0};schools.set(c,s);}if(s.seed===undefined){s.tx=x;s.ty=y;s.seed=0;}s.fish.push({x,y,vx:d*15,vy:0,ph:Math.random()*4});}else if(f.k==='sardine'){const c=Math.floor(x/420);let s=sardSchools.get(c);if(!s){s={c,fish:[],tx:x,ty:y,seed:0,form:0,vx:d*16,vy:0};sardSchools.set(c,s);}s.fish.push({x,y,ox:0,oy:0,vx:d*16,vy:0,ph:Math.random()*4,i:s.fish.length});}
+  else if(f.k==='seagull'){gulls.push({st:'loot',g:-999,x,y,bx:0,by:0,vx:d*12,vy:6,ph:Math.random()*4,face:d,spin:0});}
   else solo.push(Object.assign({k:f.k,c:-999,x,y,vx:d*20,vy:0,ph:Math.random()*4,tx:x+d*250,ty:y,tt:8,cool:6},f.k==='dolphin'?{hp:4,maxhp:4}:f.k==='mako'?{hp:5,maxhp:5}:null));}
-const FSPR=k=>k==='student'?[SARD,SARDC]:k==='sardine'?[SARDINE,SARDINEC]:k==='tuna'?[TUNA,TUNAC]:k==='nemo'?[NEMO,NEMOC]:k==='puffer'?[PUFFER,PUFFC]:k==='dolphin'?[DOLPHIN,DOLPHC]:k==='crab'?[HSM_S,HERMC]:k==='gcrab'?[HGI_S,HGIC]:k==='mcrab'?[MCRAB,MCRABC]:k==='jelly'?[JLS,JLC]:k==='king'?[GJS,GJC]:k==='cage'?[CG,CGC]:[MAKO,MAKOC];
+const FSPR=k=>k==='student'?[SARD,SARDC]:k==='sardine'?[SARDINE,SARDINEC]:k==='tuna'?[TUNA,TUNAC]:k==='nemo'?[NEMO,NEMOC]:k==='puffer'?[PUFFER,PUFFC]:k==='dolphin'?[DOLPHIN,DOLPHC]:k==='seagull'?[SEAGULL,SEAGULLC]:k==='crab'?[HSM_S,HERMC]:k==='gcrab'?[HGI_S,HGIC]:k==='mcrab'?[MCRAB,MCRABC]:k==='jelly'?[JLS,JLC]:k==='king'?[GJS,GJC]:k==='cage'?[CG,CGC]:[MAKO,MAKOC];
 function ropeAt(s){const k=Math.max(0,s/RL),i=Math.min(RN-2,Math.floor(k)),f=Math.min(1,k-i),a=ROPE[i],b=ROPE[i+1];return [a.x+(b.x-a.x)*f,a.y+(b.y-a.y)*f];}
-function cargoSpan(k){if(k==='sardine')return 3;if(k==='nemo')return 8;if(k==='puffer')return 9;if(k==='dolphin')return 24;return FSPR(k)[0].frames[0][0].length;}
+function cargoSpan(k){if(k==='sardine')return 3;if(k==='nemo')return 8;if(k==='puffer')return 9;if(k==='dolphin')return 24;if(k==='seagull')return 12;return FSPR(k)[0].frames[0][0].length;}
 function ropeNeed(){let s=4;for(const f of DV.carry)s+=cargoSpan(f.k)+2;return s;}
 function drawRope(T){if(!ROPE.length)return;const n=Math.min(RN-1,Math.ceil(Math.max(14,ropeNeed())/RL));
   for(let i=1;i<=n;i++){const a=ROPE[i-1],b=ROPE[i];for(let s=0;s<=2;s++){const f=s/2;put(Math.round(a.x+(b.x-a.x)*f-cx),Math.round(a.y+(b.y-a.y)*f-cy),27);}}
@@ -576,11 +618,15 @@ function skewer(T){const tx=SPR.x,ty=SPR.y;const kingLoad=hasKing()||SPR.fish.so
   if(!kingLoad)for(const [,s] of schools)for(let i=s.fish.length-1;i>=0;i--){const f=s.fish[i];if(Math.hypot(f.x-tx,f.y-ty)<5){s.fish.splice(i,1);SPR.fish.push({k:'student',ph:Math.random()*4});bleed(tx,ty,3);}}
   if(!kingLoad)for(const [,s] of sardSchools)for(let i=s.fish.length-1;i>=0;i--){const f=s.fish[i];if(Math.hypot(f.x-tx,f.y-ty)<3.5){s.fish.splice(i,1);SPR.fish.push({k:'sardine',ph:Math.random()*4});bleed(tx,ty,2);}}
   if(!kingLoad)for(let i=solo.length-1;i>=0;i--){const e=solo[i];if(e.onHook||e===DV.ride)continue;const r=e.k==='nemo'?6:e.k==='puffer'?7:e.k==='dolphin'?12:e.k==='tuna'?10:15;if(Math.hypot(e.x-tx,e.y-ty)<r){if(SPR.hit.has(e))continue;SPR.hit.add(e);const mh=soloMaxHp(e.k);if(e.maxhp===undefined)e.maxhp=mh;if(e.hp===undefined)e.hp=e.maxhp;e.hp--;e.hpShow=T+3;
-    if(e.hp>0){bleed(tx,ty,3);e.flash=T+0.15;e.vx+=Math.cos(SPR.ang)*45;e.vy+=Math.sin(SPR.ang)*45;e.fleeT=T+(e.k==='mako'?6+Math.random()*2:5);SPR.vx*=-0.25;SPR.vy*=-0.25;continue;}solo.splice(i,1);for(const s of solo)if(s.chase===e)s.chase=null;SPR.fish.push({k:e.k,ph:Math.random()*4});bleed(tx,ty,8);}}}
+    if(e.hp>0){bleed(tx,ty,3);e.flash=T+0.15;e.vx+=Math.cos(SPR.ang)*45;e.vy+=Math.sin(SPR.ang)*45;e.fleeT=T+(e.k==='mako'?6+Math.random()*2:5);SPR.vx*=-0.25;SPR.vy*=-0.25;continue;}solo.splice(i,1);for(const s of solo)if(s.chase===e)s.chase=null;SPR.fish.push({k:e.k,ph:Math.random()*4});bleed(tx,ty,8);}}
+  if(!kingLoad)for(let i=gulls.length-1;i>=0;i--){const g=gulls[i];if(SPR.hit.has(g))continue;if(Math.hypot(g.x-tx,g.y-ty)>(g.st==='fly'?12:10))continue;SPR.hit.add(g);
+    if(g.st==='fly'){gullHit(g,T,[Math.cos(SPR.ang)*30,Math.sin(SPR.ang)*30+10]);SPR.vx*=-0.2;SPR.vy*=-0.2;continue;}
+    if(g.st==='loot'){gulls.splice(i,1);SPR.fish.push({k:'seagull',ph:Math.random()*4});bleed(tx,ty,4);}}}
 function updSpear(dt,T){if(!SPR.st)return;const m=muzzle();const ox0=SPR.x,oy0=SPR.y;SPR.age+=dt;if(!keys.Space)SPR.rel=true;
   if(SPR.st===1){const k=Math.exp(-2.2*dt);SPR.vx*=k;SPR.vy*=k;if(Math.hypot(SPR.vx,SPR.vy)<15)SPR.vy+=5*dt;
     SPR.x+=SPR.vx*dt;SPR.y+=SPR.vy*dt;const fl=useRav(SPR.x,SPR.y)?1e9:floorY(SPR.x)-1;if(SPR.y>fl){SPR.y=fl;SPR.vx=SPR.vy=0;}if(useRav(SPR.x,SPR.y)&&!isOpen(SPR.x,SPR.y)){for(let k=0;k<12&&!isOpen(SPR.x,SPR.y);k++){SPR.x-=SPR.vx*dt/12;SPR.y-=SPR.vy*dt/12;}SPR.vx=SPR.vy=0;}spearCargoCollide();if(SPR.x<WALLX+2){SPR.x=WALLX+2;SPR.vx=SPR.vy=0;}
-    const sf=surfY(SPR.x,T)+1;if(SPR.y<sf){SPR.y=sf;SPR.vy=Math.max(0,SPR.vy);}
+    // allow spear into sky for seagulls; soft pull-back only far above camera sky
+    if(SPR.y<cy-40){SPR.y=cy-40;if(SPR.vy<0)SPR.vy=0;}
     if(SPR.rel&&keys.Space)SPR.st=2;}
   if(SPR.st===2&&(keys.Space||SPR.auto)){const dx=m[0]-SPR.x,dy=m[1]-SPR.y,d=Math.hypot(dx,dy);
     if(d<6){for(const f of SPR.fish){if(carryW()+fw(f.k)<=CAP)DV.carry.push(f);else{releaseFish(f,m[0],m[1]);DV.fullT=T+2;}}SPR.fish=[];SPR.st=0;SPR.auto=false;return;}const v=Math.min(d,120*dt);SPR.x+=dx/d*v;SPR.y+=dy/d*v;SPR.ang=Math.atan2(-dy,-dx);}
@@ -641,14 +687,14 @@ function drawDeck(c,s_,bx,by,K,F,th,T){const L=(X,Y)=>{let u=(X-15)*K,v=Y-8;if(F
     if(T>f.nf){f.fl=0.35;f.nf=T+1.5+Math.random()*4;f.flip=!f.flip;}let hop=0;if(f.fl>0){f.fl-=0.016;hop=Math.sin((0.35-f.fl)/0.35*Math.PI)*1.6;}
     const X=1.8+(i%3)*2.6,Y=4.2-Math.floor(i/3)*1.5-hop,[px,py]=L(X,Y);
     if(isReef(f.k)){drawReefCarry(f.k,px,py,!f.flip,th+(i%2?0.12:-0.12)+(hop?0.4:0),undefined,reefSc(f.k,"deck"),i);continue;}
-    const [S,PC]=FSPR(f.k),sc=({student:0.9,sardine:1.2,tuna:0.55,mako:0.42,crab:1,gcrab:0.45,mcrab:1,jelly:1,king:0.55,nemo:1,puffer:0.85}[f.k])||1;
+    const [S,PC]=FSPR(f.k),sc=({student:0.9,sardine:1.2,tuna:0.55,mako:0.42,crab:1,gcrab:0.45,mcrab:1,jelly:1,king:0.55,nemo:1,puffer:0.85,seagull:0.55}[f.k])||1;
     drawRotS(S.frames[0],PC,px,py,f.flip,th+(i%2?0.12:-0.12)+(hop?0.4:0),sc,undefined,P32[16]);}}
 function drawEBox(x,y,K='E'){for(let j=0;j<12;j++)for(let i=0;i<11;i++){const corner=(i==0||i==10)&&(j==0||j==11);if(corner)continue;
     const edge=i==0||i==10||j==0||j==11;let c=edge?28:((i<=1||i>=9||j<=1)?29:(j>=9?32:30));if(!edge&&(i==1||i==9)&&j==1)c=28;put(x+i,y+j,c);}
   const g=F[K];for(let k=0;k<15;k++)if(g[k]=="1"){const gx=x+2+(k%3)*2,gy=y+2+(k/3|0)+((k/3|0)>=2?1:0);put(gx,gy,31);put(gx+1,gy,31);}}
 function drawDiveHUD(T){if(DV.on&&DV.near&&!DV.ride)drawEBox(Math.round(B.x-cx-5),Math.round(B.y-cy-34+Math.sin(T*3)*1.5));
   const rd=nearDolphin();if(rd)drawEBox(Math.round(rd.x-cx-5),Math.round(rd.y-cy-24+Math.sin(T*3)*1.5));
-  const y0=20,carry=DV.carry.length+SPR.fish.length,fishing=fish.st>=2,rodTxt=fishing?"  ROD "+rodW()+"/"+ROD_CAP:"",label=String(deck.length)+rodTxt+(DV.on?"  CARRY "+carryW()+"/"+CAP:"");
+  const y0=20,carry=DV.carry.length+SPR.fish.length,fishing=fish.st>=2,wFmt=w=>(Math.round(w*10)/10),rodTxt=fishing?"  ROD "+wFmt(rodW())+"/"+ROD_CAP:"",label=String(deck.length)+rodTxt+(DV.on?"  CARRY "+wFmt(carryW())+"/"+CAP:"");
   for(let y=y0;y<y0+9;y++)for(let x=3;x<(DV.on?86:(fishing?18+label.length*4+8:40));x++)put(x,y,0);
   const fr=SARD.frames[0];for(let j=0;j<6;j++)for(let i=0;i<11;i++){const ch=fr[j][i];if(ch!=='.'){const [r,g,b]=SARDC[+ch];buf[(y0+1+j)*W+5+i]=0xff000000|(b<<16)|(g<<8)|r;}}
   text(label,18,y0+2,6);if(DV.on&&T<(DV.fullT||0)&&Math.sin(T*10)>-0.3)text("FULL",88,y0+2,25);
@@ -660,9 +706,9 @@ addEventListener('mousedown',e=>{if(e.button!==0)return;const r=cv.getBoundingCl
 addEventListener('mouseup',e=>{mouse.down=false;});
 F["+"]="000010111010000";F["/"]="001001010100100";
 // ---- feeding the squid
-const PTS={student:10,sardine:3,tuna:50,mako:150,crab:25,gcrab:150,mcrab:50,jelly:15,king:500,nemo:30,puffer:40,dolphin:80},THX={student:"MMM, STUDENT! SALTY LITTLE SNACK. THANKS!",sardine:"TINY SARDINES! A WHOLE MOUTHFUL. THANKS!",tuna:"A WHOLE TUNA?! YOU SPOIL ME. THANK YOU!",mako:"A SHARK?! CRUNCHY. YOU ARE MY HERO.",crab:"A HERMIT CRAB! CRUNCHY SHELL SNACK.",gcrab:"A GIANT CRAB?! MOSSY AND DELICIOUS!",mcrab:"A MUD CRAB FROM YOUR CAGE! SO FRESH.",jelly:"A GLOWING JELLY! IT TINGLES. I LOVE IT.",king:"THE KING JELLY?! YOU ARE A LEGEND. FEAST!",nemo:"A CLOWNFISH! ORANGE AND SNAPPY. THANK YOU!",puffer:"A PUFFER! ROUND AND PRICKLY. I LOVE IT!",dolphin:"A DOLPHIN?! SMOOTH AND SILVERY. THANK YOU!"};
+const PTS={student:10,sardine:3,tuna:50,mako:150,crab:25,gcrab:150,mcrab:50,jelly:15,king:500,nemo:30,puffer:40,dolphin:80,seagull:30},THX={student:"MMM, STUDENT! SALTY LITTLE SNACK. THANKS!",sardine:"TINY SARDINES! A WHOLE MOUTHFUL. THANKS!",tuna:"A WHOLE TUNA?! YOU SPOIL ME. THANK YOU!",mako:"A SHARK?! CRUNCHY. YOU ARE MY HERO.",crab:"A HERMIT CRAB! CRUNCHY SHELL SNACK.",gcrab:"A GIANT CRAB?! MOSSY AND DELICIOUS!",mcrab:"A MUD CRAB FROM YOUR CAGE! SO FRESH.",jelly:"A GLOWING JELLY! IT TINGLES. I LOVE IT.",king:"THE KING JELLY?! YOU ARE A LEGEND. FEAST!",nemo:"A CLOWNFISH! ORANGE AND SNAPPY. THANK YOU!",puffer:"A PUFFER! ROUND AND PRICKLY. I LOVE IT!",dolphin:"A DOLPHIN?! SMOOTH AND SILVERY. THANK YOU!",seagull:"A SEAGULL! CRISPY SKY SNACK. THANKS!"};
 const FEED={f:null,fl:[],thank:null,pops:[],eaten:0,yumT:-9,yum:''};let score=0;const STORE={get(k){try{return window.localStorage.getItem(k);}catch(e){return STORE.m[k]??null;}},set(k,v){STORE.m[k]=String(v);try{window.localStorage.setItem(k,v);}catch(e){}},m:{}};try{const sv=STORE.get('deepsea_score');score=+(sv!==null?sv:(STORE.get('deepsea_best')||0))||0;STORE.set('deepsea_score',score);}catch(e){score=0;}try{UP.thruster=+(STORE.get('deepsea_up_thruster')||0)||0;UP.rope=+(STORE.get('deepsea_up_rope')||0)||0;UP.flippers=+(STORE.get('deepsea_up_flippers')||0)||0;if(UP.rope)CAP=10;}catch(e){}
-const DECK_OK={student:1,sardine:1,tuna:1,mako:1,crab:1,gcrab:1,mcrab:1,jelly:1,king:1,nemo:1,puffer:1,dolphin:1};
+const DECK_OK={student:1,sardine:1,tuna:1,mako:1,crab:1,gcrab:1,mcrab:1,jelly:1,king:1,nemo:1,puffer:1,dolphin:1,seagull:1};
 function saveDeck(){try{STORE.set('deepsea_deck',deck.map(f=>f.k).filter(k=>DECK_OK[k]).join(','));}catch(e){}}
 function loadDeck(){try{const raw=STORE.get('deepsea_deck');if(!raw)return;for(const k0 of String(raw).split(',')){const k=k0==='sard'?'student':k0;if(DECK_OK[k])deck.push(newDeck(k));}}catch(e){}}
 function playDrop(rate,vol){if(!actx||!blipBuf)return;const s=actx.createBufferSource(),g=actx.createGain();s.buffer=blipBuf;s.playbackRate.value=rate;g.gain.value=vol;s.connect(g);g.connect(actx.destination);s.start();}
@@ -874,7 +920,7 @@ function stepReefFish(e,dt,Tm){
 let last=performance.now(),T=DAY_CYCLE*0.45;loadDeck();
 let frameErr=0;function frame(now){try{frame0(now);}catch(e){if(!frameErr){frameErr=1;console.warn('frame error (logged once):',e);}last=now;}requestAnimationFrame(frame);}
 function frame0(now){const dt=Math.min(0.05,(now-last)/1000);last=now;T+=dt;
-  physics(dt,T);if(HOLD){B.x=HOLD.x;B.y=HOLD.y;B.vx=B.vy=0;cx=B.x-W/2;cy=B.y-H/2;}updTurn(dt);updFish(dt,T);updSchools(dt,T);updSea(dt,T);updCrabs(dt,T);updCages(dt,T);updJelly(dt,T);updFreeKing(dt,T);updBoss(dt,T);updDiver(dt,T);updFeed(dt,T);
+  physics(dt,T);if(HOLD){B.x=HOLD.x;B.y=HOLD.y;B.vx=B.vy=0;cx=B.x-W/2;cy=B.y-H/2;}updTurn(dt);updFish(dt,T);updSchools(dt,T);updSea(dt,T);updGulls(dt,T);updCrabs(dt,T);updCages(dt,T);updJelly(dt,T);updFreeKing(dt,T);updBoss(dt,T);updDiver(dt,T);updFeed(dt,T);
   const ox=Math.floor(cx),oy=Math.floor(cy);
   // water + sky + surface. Day, night, and the lagoon tint live in seaPixel.
   DAYK=dayK(T);
@@ -903,7 +949,7 @@ function frame0(now){const dt=Math.min(0.05,(now-last)/1000);last=now;T+=dt;
       const lit=(-x-y)/(r*1.6)+0.3;const edge=(x/1.3)**2+y*y>(r-1.2)*(r-1.2);put(X,Y,edge&&(x>0||y>0)?0:(lit>bay(X+ox,Y+oy)+0.25?9:(lit<-0.2&&bay(X,Y)<0.6?0:8)));}}
   for(const s of kelpStalks(1,cx-40,cx+W+40))drawKelp(s,T,1,true);
   drawCorals(T);drawRavLip(T,ox,oy);
-  drawCages(T);drawCrabs(T);drawCliff(T);const sqb=drawSquid(T);drawSchools(T);drawSea(T);drawJelly(T);drawFreeKing(T);drawBoss(T);drawParts();drawBoat();drawDiver(T);drawFeed(T);drawPrompt(T,sqb-SQWL*(1+0.1*pulse)-2);drawBubble(T,sqb-SQWL*(1+0.1*pulse)-2);drawDark(T);drawBossGlow(T);drawBoatMarker(T);
+  drawCages(T);drawCrabs(T);drawCliff(T);const sqb=drawSquid(T);drawSchools(T);drawSea(T);drawJelly(T);drawFreeKing(T);drawBoss(T);drawParts();drawGulls(T);drawBoat();drawDiver(T);drawFeed(T);drawPrompt(T,sqb-SQWL*(1+0.1*pulse)-2);drawBubble(T,sqb-SQWL*(1+0.1*pulse)-2);drawDark(T);drawBossGlow(T);drawBoatMarker(T);
   nearSquid=!DV.on&&Math.abs(B.x-SQX)<130&&B.y<40;
   // depth meter
   const dd=DV.on?DV.y-surfY(DV.x,T):B.y-surfY(B.x,T);const dep=Math.max(0,Math.round(dd/10));
@@ -936,7 +982,7 @@ function cageKey(T){if(talk.on)return;
   if(CC.key===1&&!DV.on){CC.key=2;CC.stock=CAGE_MAX;STORE.set('deepsea_cagekey',2);cageMsg(CAGE_KEY_NAME+' USED: 5 CAGES!',T);playDrop(1.2,0.5);return;}
   if(CC.key!==2)return;if(CC.list.length>=CAGE_MAX){cageMsg('MAX 5 CAGES PLACED',T,2);return;}if(CC.stock<=0){cageMsg('NO CAGES LEFT',T,2);return;}
   const x=DV.on?DV.x:B.x+B.face*14,y=DV.on?DV.y+4:Math.max(B.y,surfY(B.x,T)+2);CC.stock--;CC.list.push({x,y,vx:DV.on?DV.vx*0.3||0:B.vx*0.2,vy:0,lvl:0,on:false,next:0});splash(x,surfY(x,T),DV.on?0:8,0.4);playDrop(0.8,0.5);}
-const DROP_NAME={student:'STUDENT',sardine:'SARDINE',tuna:'TUNA',mako:'SHARK',crab:'HERMIT CRAB',gcrab:'GIANT CRAB',mcrab:'MUD CRAB',jelly:'JELLY',king:'KING JELLY',cage:'CRAB CAGE',nemo:'CLOWNFISH',puffer:'PUFFER'};
+const DROP_NAME={student:'STUDENT',sardine:'SARDINE',tuna:'TUNA',mako:'SHARK',crab:'HERMIT CRAB',gcrab:'GIANT CRAB',mcrab:'MUD CRAB',jelly:'JELLY',king:'KING JELLY',cage:'CRAB CAGE',nemo:'CLOWNFISH',puffer:'PUFFER',dolphin:'DOLPHIN',seagull:'SEAGULL'};
 function dropOldest(T){const f=DV.carry.shift();if(!f)return;const x=f.lx||DV.x,y=f.ly||DV.y+6;
   if(f.k==='cage'){CC.list.push({x,y,vx:0,vy:8,lvl:f.lvl|0,on:false,next:0});cageMsg('DROPPED CRAB CAGE',T,2);}
   else{releaseFish(f,x,y);cageMsg('DROPPED '+(DROP_NAME[f.k]||f.k.toUpperCase()),T,2);}
@@ -1108,7 +1154,7 @@ function drawHearts(T){const HP=[".11.11.","1111111","1111111",".11111.","..111.
 // ---- king jelly carcass (on spear/rope): 4 rope knots around the bell + limp trailing tentacles
 
 // ---- rope/spear cargo collision: solid bodies vs soft jelly cores
-const CHIT={student:[3,0],sardine:[1,0],tuna:[6,0],mako:[9,0],crab:[4,0],gcrab:[10,0],mcrab:[3,0],cage:[8,0],jelly:[2,5],king:[8,18],nemo:[2,0],puffer:[3,0],dolphin:[8,0]};
+const CHIT={student:[3,0],sardine:[1,0],tuna:[6,0],mako:[9,0],crab:[4,0],gcrab:[10,0],mcrab:[3,0],cage:[8,0],jelly:[2,5],king:[8,18],nemo:[2,0],puffer:[3,0],dolphin:[8,0],seagull:[4,0]};
 function pushPt(p,r){if(r<=0)return;let x=p.x,y=p.y;
   if(!isOpen(x,y)){let bd=1e9,bx=x,by=y;for(let a=0;a<16;a++){const th=a*Math.PI/8;for(let d=1;d<=28;d+=1){const nx=x+Math.cos(th)*d,ny=y+Math.sin(th)*d;if(isOpen(nx,ny)){if(d<bd){bd=d;bx=nx;by=ny;}break;}}}x=bx;y=by;}
   let fx=0,fy=0;for(let a=0;a<12;a++){const th=a*Math.PI/6;if(!isOpen(x+Math.cos(th)*r,y+Math.sin(th)*r)){fx-=Math.cos(th);fy-=Math.sin(th);}}
