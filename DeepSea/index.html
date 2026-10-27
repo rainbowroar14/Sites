@@ -224,7 +224,7 @@ function drawGulls(T){for(const g of gulls){const X=Math.round(g.x-cx),Y=Math.ro
 
 // ---- student schools (boids, former sardines) + tiny sardine formation schools
 const schools=new Map();const sardSchools=new Map();
-function formOff(form,i,n,seed){const s=Math.floor(seed*1000)|0,h1=hash(s+i*17+form*91),h2=hash(s+i*31+form*53+7),h3=hash(s+i*47+form*19+13),h4=hash(s+i*59+form*37+21),wv=hash(s+5)*6.28,sk=(hash(s+9)-0.5)*0.35;if(form===0){const u=(h1-0.5),x=u*170+(h3-0.5)*22,tp=1-Math.abs(u)*1.3;return[x,Math.sin(u*5+wv)*12+x*sk+(h2-0.5)*26*tp+(h4-0.5)*8];}if(form===1){const side=h3<0.45?-1:1,len=side<0?70:95,u=h1-0.5;const x=side*(38+h4*30)+u*len,y=side*(8+hash(s+3)*10)+Math.sin(u*4+wv)*8+(h2-0.5)*22*(1-Math.abs(u));return[x,y+x*sk*0.5];}const u=h1-0.5,x=u*(h3<0.6?120:200)+(h4-0.5)*20;return[x,Math.sin(u*6+wv)*14+x*sk+(h2-0.5)*(h3<0.6?20:34)*(1-Math.abs(u)*1.2)];}
+function formOff(form,i,n,seed){const s=Math.floor(seed*1000)|0,h1=hash(s+i*17+form*91),h2=hash(s+i*31+form*53+7),h3=hash(s+i*47+form*19+13),h4=hash(s+i*59+form*37+21),wv=hash(s+5)*6.28,sk=(hash(s+9)-0.5)*0.35;if(form===0){const u=(h1-0.5),x=u*240+(h3-0.5)*30,tp=1-Math.abs(u)*1.3;return[x,Math.sin(u*5+wv)*12+x*sk+(h2-0.5)*26*tp+(h4-0.5)*8];}if(form===1){const side=h3<0.45?-1:1,len=side<0?100:135,u=h1-0.5;const x=side*(54+h4*42)+u*len,y=side*(8+hash(s+3)*10)+Math.sin(u*4+wv)*8+(h2-0.5)*22*(1-Math.abs(u));return[x,y+x*sk*0.5];}const u=h1-0.5,x=u*(h3<0.6?170:280)+(h4-0.5)*28;return[x,Math.sin(u*6+wv)*14+x*sk+(h2-0.5)*(h3<0.6?20:34)*(1-Math.abs(u)*1.2)];}
 
 function updSchools(dt,T){const c0=Math.floor((cx-250)/500),c1=Math.floor((cx+W+250)/500);
   for(let c=c0;c<=c1;c++){if(schools.has(c))continue;const h=hash(c*31+7);const s={c,fish:[]};schools.set(c,s);
@@ -239,10 +239,10 @@ function updSchools(dt,T){const c0=Math.floor((cx-250)/500),c1=Math.floor((cx+W+
       f.vx+=ax*dt;f.vy+=ay*dt;const sp=Math.hypot(f.vx,f.vy);const mn=8,mxs=22;if(sp>mxs){f.vx*=mxs/sp;f.vy*=mxs/sp;}else if(sp<mn&&sp>0){f.vx*=mn/sp;f.vy*=mn/sp;}else if(sp===0)f.vx=-mn;
       f.x+=f.vx*dt;f.y+=f.vy*dt;}}
   // tiny sardine formation schools (denser chunks, giant groups)
-  const sc0=Math.floor((cx-300)/420),sc1=Math.floor((cx+W+300)/420);
+  const sc0=Math.floor((cx-300)/360),sc1=Math.floor((cx+W+300)/360);
   for(let c=sc0;c<=sc1;c++){if(sardSchools.has(c))continue;const h=hash(c*53+3);const s={c,fish:[],form:Math.floor(hash(c*53+4)*3)};sardSchools.set(c,s);
-    if(h>0.32||c*420+210<WALLX+80||hash(c*53+5)<tropLook(c*420+210)*0.85)continue;
-    const n=50+Math.floor(hash(c*53+6)*50),x0=c*420+210,y0=55+hash(c*53+7)*200,dir=hash(c*53+8)<0.5?-1:1;
+    if(h>0.20||c*360+180<WALLX+80||hash(c*53+5)<tropLook(c*360+180)*0.85)continue;
+    const n=90+Math.floor(hash(c*53+6)*90),x0=c*360+180,y0=55+hash(c*53+7)*200,dir=hash(c*53+8)<0.5?-1:1;
     s.tx=x0;s.ty=y0;s.seed=c*2.3;s.vx=dir*(14+hash(c*53+9)*10);s.vy=0;
     for(let i=0;i<n;i++){const [ox,oy]=formOff(s.form,i,n,s.seed);s.fish.push({x:x0+ox,y:y0+oy,ox,oy,ph:hash(c*17+i)*4,i});}}
   for(const [c,s] of sardSchools){if(c<sc0-3||c>sc1+3){sardSchools.delete(c);continue;}if(!s.fish.length)continue;
