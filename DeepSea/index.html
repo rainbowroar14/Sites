@@ -354,7 +354,7 @@ function formOff(form,i,n,seed){const s=Math.floor(seed*1000)|0,h1=hash(s+i*17+f
 
 function updSchools(dt,T){const c0=Math.floor((cx-250)/500),c1=Math.floor((cx+W+250)/500);
   for(let c=c0;c<=c1;c++){if(schools.has(c))continue;const h=hash(c*31+7);const s={c,fish:[]};schools.set(c,s);
-    if(h>0.6||c*500+250<WALLX+60||hash(c*31+12)<tropLook(c*500+250))continue;const n=20+Math.floor(hash(c*31+8)*21),x0=c*500+250,y0=70+hash(c*31+9)*170;
+    if(h>0.4||c*500+250<WALLX+60||hash(c*31+12)<tropLook(c*500+250))continue;const n=13+Math.floor(hash(c*31+8)*14),x0=c*500+250,y0=70+hash(c*31+9)*170;
     s.tx=x0;s.ty=y0;s.seed=c*1.7;for(let i=0;i<n;i++)s.fish.push({x:x0+(hash(c*97+i)-0.5)*50,y:y0+(hash(c*89+i)-0.5)*24,vx:(hash(c*7+i)-0.5)*10,vy:0,ph:hash(c*13+i)*4});}
   for(const [c,s] of schools){if(c<c0-3||c>c1+3){schools.delete(c);continue;}if(!s.fish.length)continue;
     s.tx=c*500+250+Math.sin(T*0.05+s.seed)*160;s.ty+=(Math.sin(T*0.13+s.seed*3)*14)*dt;
@@ -372,8 +372,8 @@ function updSchools(dt,T){const c0=Math.floor((cx-250)/500),c1=Math.floor((cx+W+
   // tiny sardine formation schools (denser chunks, giant groups)
   const sc0=Math.floor((cx-300)/360),sc1=Math.floor((cx+W+300)/360);
   for(let c=sc0;c<=sc1;c++){if(sardSchools.has(c))continue;const h=hash(c*53+3);const s={c,fish:[],form:Math.floor(hash(c*53+4)*3)};sardSchools.set(c,s);
-    if(h>0.20||c*360+180<WALLX+80||hash(c*53+5)<tropLook(c*360+180)*0.85)continue;
-    const n=90+Math.floor(hash(c*53+6)*90),x0=c*360+180,y0=55+hash(c*53+7)*200,dir=hash(c*53+8)<0.5?-1:1;
+    if(h>0.13||c*360+180<WALLX+80||hash(c*53+5)<tropLook(c*360+180)*0.85)continue;
+    const n=60+Math.floor(hash(c*53+6)*60),x0=c*360+180,y0=55+hash(c*53+7)*200,dir=hash(c*53+8)<0.5?-1:1;
     s.tx=x0;s.ty=y0;s.seed=c*2.3;s.vx=dir*(14+hash(c*53+9)*10);s.vy=0;
     for(let i=0;i<n;i++){const [ox,oy]=formOff(s.form,i,n,s.seed);s.fish.push({x:x0+ox,y:y0+oy,ox,oy,ph:hash(c*17+i)*4,i});}}
   for(const [c,s] of sardSchools){if(c<sc0-3||c>sc1+3){sardSchools.delete(c);continue;}if(!s.fish.length)continue;
@@ -447,8 +447,8 @@ function soloSpawn(){const c0=Math.floor((cx-300)/400),c1=Math.floor((cx+W+300)/
     spawnNewFish(c,x0);
     if(tw>0.92)continue;
     const ocean=1-tw;
-    if(hash(c*53+1)<0.55*ocean)solo.push({k:'tuna',c,x:x0,y:220+hash(c*53+2)*180,vx:-10,vy:0,ph:hash(c*53+3)*4,tx:x0,ty:300,tt:0});
-    {const kw=kelpLook(x0);if(kw>0.2&&hash(c*59+1)<0.5*kw)solo.push({k:'mtuna',c,x:x0+40,y:240+hash(c*59+2)*160,vx:-7,vy:0,ph:hash(c*59+3)*4,tx:x0,ty:280,tt:0,hp:3,maxhp:3});}
+    if(hash(c*53+1)<0.35*ocean)solo.push({k:'tuna',c,x:x0,y:220+hash(c*53+2)*180,vx:-10,vy:0,ph:hash(c*53+3)*4,tx:x0,ty:300,tt:0});
+    {const kw=kelpLook(x0);if(kw>0.2&&hash(c*59+1)<0.32*kw)solo.push({k:'mtuna',c,x:x0+40,y:240+hash(c*59+2)*160,vx:-7,vy:0,ph:hash(c*59+3)*4,tx:x0,ty:280,tt:0,hp:3,maxhp:3});}
     if(hash(c*71+5)<0.3*ocean){const fl=floorY(x0);const sf0=surfY(x0,0);const my=Math.min(fl-40,Math.max(sf0+800,sf0+MAKO_DEEP+(hash(c*71+6)-0.5)*200));solo.push({k:'mako',c,x:x0+90,y:my,vx:18,vy:0,ph:hash(c*71+7)*4,tx:x0,ty:my,tt:0,cool:0,hp:5,maxhp:5,knowT:0,mode:'patrol',fleeX:0,fleeY:0,fleeUntil:0,panicUntil:0,atkCd:0});}}
   solo=solo.filter(e=>{if(e.onHook)return true;const keep=e.x>cx-1400&&e.x<cx+W+1400;if(!keep)soloC.delete(e.c);return keep;});}
 function steer(e,tx,ty,sp,dt,acc){const dx=tx-e.x,dy=ty-e.y,d=Math.hypot(dx,dy)||1;e.vx+=(dx/d*sp-e.vx)*Math.min(1,acc*dt);e.vy+=(dy/d*sp-e.vy)*Math.min(1,acc*dt);}
@@ -522,7 +522,7 @@ const DOLPHIN_SPR={swim:"sprites/dolphin/dolphin_swim.png",right:"sprites/dolphi
 function loadReefFish(){grabSheet("sprites/fish/clownfish_swim.png",48,fr=>{reefImg.swim=fr;});grabSheet("sprites/fish/puffer.png",56,fr=>{reefImg.right=fr&&fr[0];});grabSheet("sprites/fish/puffer_left.png",56,fr=>{reefImg.left=fr&&fr[0];});grabSheet(DOLPHIN_SPR.swim,DOLPHIN_SPR.fw,fr=>{reefImg.dswim=fr;});grabSheet(DOLPHIN_SPR.right,DOLPHIN_SPR.fw,fr=>{reefImg.dright=fr&&fr[0];});grabSheet(DOLPHIN_SPR.left,DOLPHIN_SPR.fw,fr=>{reefImg.dleft=fr&&fr[0];});}
 loadReefFish();
 const nfImg={};function loadNewFish(){for(const k in NF)grabSheet("sprites/newfish/"+k+"_swim.png",NF[k].w,fr=>{nfImg[k]=fr;});}loadNewFish();
-function blitReef(im,sx,sy,mirror,ang,Tm,sc,flash,edgeFade){if(!im)return false;sc=sc||1;ang=ang||0;const w=im.w,h=im.h,c=Math.cos(ang),sn=Math.sin(ang),hw=w/2,hh=h/2,R=Math.ceil(Math.hypot(hw,hh)*sc)+1,dim=flash?1:(0.68+0.32*(typeof DAYK==="number"?DAYK:1)),fade=edgeFade?tropLook(sx+cx):1;
+function blitReef(im,sx,sy,mirror,ang,Tm,sc,flash,edgeFade){if(!im)return false;sc=sc||1;ang=ang||0;const w=im.w,h=im.h,c=Math.cos(ang),sn=Math.sin(ang),hw=w/2,hh=h/2,R=Math.ceil(Math.hypot(hw,hh)*sc)+1,dim=flash?1:(0.68+0.32*(typeof DAYK==="number"?DAYK:1)),fade=typeof edgeFade==='number'?edgeFade:edgeFade?tropLook(sx+cx):1;
   for(let dy=-R;dy<=R;dy++)for(let dx=-R;dx<=R;dx++){let X=Math.floor((c*dx+sn*dy)/sc+hw),Y=Math.floor((-sn*dx+c*dy)/sc+hh);if(X<0||X>=w||Y<0||Y>=h)continue;if(mirror)X=w-1-X;const i=(Y*w+X)*4;if(im.d[i+3]<128)continue;
     if(fade<0.92&&((X*17+Y*13)&255)>(0.2+0.8*fade)*255)continue;
     let r=im.d[i]*dim,g=im.d[i+1]*dim,b=im.d[i+2]*dim;if(flash){r=Math.min(255,r*0.35+180);g=Math.min(255,g*0.35+180);b=Math.min(255,b*0.35+180);}const px=Math.round(sx+dx),py=Math.round(sy+dy);if(px<0||px>=W||py<0||py>=H)continue;
@@ -530,7 +530,7 @@ function blitReef(im,sx,sy,mirror,ang,Tm,sc,flash,edgeFade){if(!im)return false;
     buf[py*W+px]=0xff000000|((b|0)<<16)|((g|0)<<8)|(r|0);}return true;}
 function reefFr(Tm,ph){return ((Math.floor((Tm||0)*7+(ph||0))%4)+4)%4;}
 function drawReefCarry(k,sx,sy,flip,ang,Tm,sc,ph){if(NF[k])return blitReef(nfImg[k]&&nfImg[k][reefFr(Tm,ph)],sx,sy,!flip,ang,Tm,sc,false);if(k==="nemo")return blitReef(reefImg.swim&&reefImg.swim[reefFr(Tm,ph)],sx,sy,!flip,ang,Tm,sc,false);if(k==="dolphin"){const fr=reefImg.dswim&&reefImg.dswim[reefFr(Tm,ph)];if(fr)return blitReef(fr,sx,sy,!flip,ang,Tm,sc,false);return blitReef(reefImg.dright,sx,sy,!flip,ang,Tm,sc,false);}return blitReef(reefImg.right,sx,sy,!flip,ang,Tm,sc,false);}
-function drawReefSwim(e,sx,sy,th,Tm){const face=e.face||(e.vx>=0?1:-1),flash=(e.flash||0)>Tm;if(NF[e.k])return blitReef(nfImg[e.k]&&nfImg[e.k][e.air?1:reefFr(Tm*(e.k==='sunfish'?0.5:e.k==='flyingfish'?1.8:1),e.ph)],sx,sy,face<0,th,Tm,NF[e.k].sc,flash,NF[e.k].b==='lagoon');if(e.k==="nemo")return blitReef(reefImg.swim&&reefImg.swim[reefFr(Tm,e.ph)],sx,sy,face<0,th,Tm,RFSC.swimN,flash,true);if(e.k==="dolphin"){let ath=th;if(e===DV.ride&&DV.hop>0){const nose=Math.max(-1.05,Math.min(1.05,Math.atan2(e.vy,Math.abs(e.vx)||20)));ath=face<0?-nose:nose;}const fr=reefImg.dswim&&reefImg.dswim[reefFr(Tm,e.ph)];if(fr)return blitReef(fr,sx,sy,face<0,ath,Tm,RFSC.swimD,flash,true);if(face<0&&reefImg.dleft)return blitReef(reefImg.dleft,sx,sy,false,-ath,Tm,RFSC.swimD,flash,true);return blitReef(reefImg.dright,sx,sy,face<0,ath,Tm,RFSC.swimD,flash,true);}if(face<0&&reefImg.left)return blitReef(reefImg.left,sx,sy,false,-th,Tm,RFSC.swimP,flash,true);return blitReef(reefImg.right,sx,sy,face<0,th,Tm,RFSC.swimP,flash,true);}
+function drawReefSwim(e,sx,sy,th,Tm){const face=e.face||(e.vx>=0?1:-1),flash=(e.flash||0)>Tm;if(NF[e.k])return blitReef(nfImg[e.k]&&nfImg[e.k][e.air?1:reefFr(Tm*(e.k==='sunfish'?0.5:e.k==='lionfish'?0.25:e.k==='flyingfish'?1.8:e.k==='mackerel'?1.5:1),e.ph)],sx,sy,face<0,th,Tm,NF[e.k].sc,flash,e.camo?0.4:NF[e.k].b==='lagoon');if(e.k==="nemo")return blitReef(reefImg.swim&&reefImg.swim[reefFr(Tm,e.ph)],sx,sy,face<0,th,Tm,RFSC.swimN,flash,true);if(e.k==="dolphin"){let ath=th;if(e===DV.ride&&DV.hop>0){const nose=Math.max(-1.05,Math.min(1.05,Math.atan2(e.vy,Math.abs(e.vx)||20)));ath=face<0?-nose:nose;}const fr=reefImg.dswim&&reefImg.dswim[reefFr(Tm,e.ph)];if(fr)return blitReef(fr,sx,sy,face<0,ath,Tm,RFSC.swimD,flash,true);if(face<0&&reefImg.dleft)return blitReef(reefImg.dleft,sx,sy,false,-ath,Tm,RFSC.swimD,flash,true);return blitReef(reefImg.dright,sx,sy,face<0,ath,Tm,RFSC.swimD,flash,true);}if(face<0&&reefImg.left)return blitReef(reefImg.left,sx,sy,false,-th,Tm,RFSC.swimP,flash,true);return blitReef(reefImg.right,sx,sy,face<0,th,Tm,RFSC.swimP,flash,true);}
 function drawSea(T){
   for(const e of solo){const reef=isReef(e.k),S=e.k==='mtuna'?MTUNA:e.k==='tuna'?TUNA:e.k==='nemo'?NEMO:e.k==='puffer'?PUFFER:e.k==='dolphin'?DOLPHIN:MAKO,PCc=e.k==='mtuna'?MTUNAC:e.k==='tuna'?TUNAC:e.k==='nemo'?NEMOC:e.k==='puffer'?PUFFC:e.k==='dolphin'?DOLPHC:MAKOC,w=reef&&NF[e.k]?Math.ceil(NF[e.k].w*NF[e.k].sc):reef?(e.k==='dolphin'?42:e.k==='puffer'?16:14):(e.k==='mtuna'?Math.ceil(S.frames[0][0].length*1.3):S.frames[0][0].length),h=reef&&NF[e.k]?Math.ceil(NF[e.k].h*NF[e.k].sc):reef?(e.k==='dolphin'?14:e.k==='puffer'?14:10):(e.k==='mtuna'?Math.ceil(S.frames[0].length*1.3):S.frames[0].length);
     const X=Math.round(e.x-cx-w/2),Y=Math.round(e.y-cy-h/2);if(X<-w||X>W||Y<-h||Y>H)continue;
@@ -721,7 +721,7 @@ const F={B:"110101110101110",G:"111100101101111",J:"001001001101111",K:"10110111
 function text(s,x,y,c){for(const ch of s){const g=F[ch]||F[" "];for(let i=0;i<15;i++)if(g[i]=="1")put(x+i%3,y+(i/3|0),c);x+=4;}}
 function text2x(s,x,y,c){for(const ch of s){const g=F[ch]||F[" "];for(let i=0;i<15;i++)if(g[i]=="1"){const px=x+(i%3)*2,py=y+(i/3|0)*2;put(px,py,c);put(px+1,py,c);put(px,py+1,c);put(px+1,py+1,c);}x+=8;}}
 function fleeRot(o,dx,dy,d,T,dt){if(!((o.fleeT||0)>T)||o.fa===undefined){o.fa=(Math.random()*2-1)*0.175;o.ft=0;}o.ft=Math.max(-0.175,Math.min(0.175,(o.ft||0)+(Math.random()*2-1)*0.6*dt));const a=o.fa+o.ft,c=Math.cos(a),n=Math.sin(a),ux=dx/d,uy=dy/d;return[ux*c-uy*n,ux*n+uy*c];}
-const VER="V62";
+const VER="V63";
 function textA(s,x,y,c,a){for(const ch of s){const g=F[ch]||F[" "];for(let i=0;i<15;i++)if(g[i]=="1"){const px=x+(i%3),py=y+(i/3|0);if(px>=0&&px<W&&py>=0&&py<H){const dst=buf[py*W+px],src=P32[c],dr=dst&255,dg=(dst>>8)&255,db=(dst>>16)&255,sr=src&255,sg=(src>>8)&255,sb=(src>>16)&255;const r=(dr+(sr-dr)*a)|0,g2=(dg+(sg-dg)*a)|0,b=(db+(sb-db)*a)|0;buf[py*W+px]=0xff000000|(b<<16)|(g2<<8)|r;}}x+=4;}}
 function drawVer(){const s=VER;textA(s,W-2-s.length*4,H-7,10,0.5);}
 const FD={" ":"00000000000000000000000000000000000",A:"01110100011000111111100011000110001",B:"11110100011000111110100011000111110",C:"01111100001000010000100001000001111",D:"11110100011000110001100011000111110",E:"11111100001000011110100001000011111",F:"11111100001000011110100001000010000",G:"01111100001000010111100011000101110",H:"10001100011000111111100011000110001",I:"11111001000010000100001000010011111",J:"00111000100001000010000101001001100",K:"10001100101010011000101001001010001",L:"10000100001000010000100001000011111",M:"10001110111010110101100011000110001",N:"10001110011010110011100011000110001",O:"01110100011000110001100011000101110",P:"11110100011000111110100001000010000",Q:"01110100011000110001101011001001101",R:"11110100011000111110101001001010001",S:"01111100001000001110000010000111110",T:"11111001000010000100001000010000100",U:"10001100011000110001100011000101110",V:"10001100011000110001100010101000100",W:"10001100011000110101101011010101010",X:"10001100010101000100010101000110001",Y:"10001100010101000100001000010000100",Z:"11111000010001000100010001000011111","0":"01110100011001110101110011000101110","1":"00100011000010000100001000010001110","2":"01110100010000100010001000100011111","3":"11110000010000101110000010000111110","4":"10001100011000111111000010000100001","5":"11111100001000011110000010000111110","6":"01110100001000011110100011000101110","7":"11111000010001000100010000100001000","8":"01110100011000101110100011000101110","9":"01110100011000101111000010000101110","!":"00100001000010000100001000000000100",".":"00000000000000000000000000000000100",",":"00000000000000000000000000010001000","?":"01110100010000100010001000000000100","'":"00100001000000000000000000000000000","-":"00000000000000011111000000000000000","/":"00001000100001000100010000100010000","[":"01110010000100001000010000100001110","]":"01110000100001000010000100001001110","%":"11001110100001000100010000101110011",":":"00000001000000000000000000010000000"};
@@ -1291,21 +1291,24 @@ function reefFrame(e,Tm){
 function reefTop(x){const fl=floorY(x);return Math.max(surfY(x,0)+18,fl-160);}
 function spawnReefFish(c,x0){
   const fl=floorY(x0),top=reefTop(x0),span=Math.max(16,fl-top-8),tw=Math.max(0.25,Math.min(1,tropLook(x0)));
-  const n=Math.max(1,Math.round((3+Math.floor(hash(c*13+1)*2))*tw));
+  const n=Math.max(1,Math.round((2+Math.floor(hash(c*13+1)*2))*tw));
   for(let i=0;i<n;i++)solo.push({k:"nemo",c,x:x0-160+hash(c*17+i)*320,y:top+6+hash(c*19+i)*span,vx:hash(c*23+i)<0.5?-14:14,vy:0,ph:hash(c*29+i)*4,tx:x0,ty:top+24,tt:0.3+hash(c*31+i),face:hash(c*23+i)<0.5?-1:1});
-  if(hash(c*71+5)<0.95*(0.4+0.6*tw))solo.push({k:"puffer",c,x:x0-60+hash(c*73)*180,y:top+8+hash(c*79)*span*0.7,vx:4,vy:0,ph:hash(c*83)*4,tx:x0,ty:top+20,tt:1.2,puff:1,face:1});
+  if(hash(c*71+5)<0.6*(0.4+0.6*tw))solo.push({k:"puffer",c,x:x0-60+hash(c*73)*180,y:top+8+hash(c*79)*span*0.7,vx:4,vy:0,ph:hash(c*83)*4,tx:x0,ty:top+20,tt:1.2,puff:1,face:1});
   if(hash(c*97+4)<0.48*tw){const face=hash(c*101)<0.5?-1:1;solo.push({k:"dolphin",c,x:x0-120+hash(c*103)*240,y:top+12+hash(c*107)*Math.max(12,span*0.75),vx:face*16,vy:0,ph:hash(c*109)*4,tx:x0,ty:top+36,tt:0.8+hash(c*113)*2,face,hp:4,maxhp:4});}
 }
 // V61: spawn + AI for the new biome fish (NF table). Ocean/kelp/lagoon stay in their biome; anglerfish live in the ravine cavern.
 function spawnNewFish(c,x0){const tw=tropLook(x0),kw=kelpLook(x0),nearRv=Math.abs(x0-RVX)<500,ow=Math.max(0,1-tw-kw)*(x0<KELP0?1:(nearRv?0:0.35)),sf=surfY(x0,0),fl=floorY(x0);
   const add=(k,i,y0,y1,p)=>{if(hash(c*131+i*17+3)>=p)return;const f=NF[k],face=hash(c*137+i*7)<0.5?-1:1;y1=Math.max(y0+10,y1);const y=Math.min(fl-10,y0+hash(c*139+i*11)*(y1-y0));solo.push({k,c,x:x0-150+hash(c*149+i*13)*300,y,vx:face*f.sp*0.5,vy:0,ph:hash(c*151+i)*4,tx:x0,ty:y,tt:0.5,face,hp:f.hp,maxhp:f.hp,y0,y1,home:x0});};
-  if(ow>0.05){add('mackerel',1,sf+40,sf+260,0.45*ow);
-    if(hash(c*191+2)<0.3*ow){const n=5+Math.floor(hash(c*193)*4),dir=hash(c*197)<0.5?-1:1;let prev=null;for(let i=0;i<n;i++){const e={k:'flyingfish',c,x:x0-dir*i*14,y:sf+24,vx:dir*40,vy:0,ph:hash(c*199+i)*4,tx:x0,ty:sf+24,tt:1,face:dir,dir,hp:1,maxhp:1,home:x0,lead:prev,hist:[]};solo.push(e);prev=e;}}
-    if(hash(c*211+3)<0.22*ow){const n=3+Math.floor(hash(c*213)*3),g={tx:x0,ty:sf+90,tt:0,home:x0,m:[],t:-1};for(let i=0;i<n;i++){const e={k:'mahimahi',c,x:x0+(i-n/2)*34,y:sf+70+hash(c*217+i)*60,vx:0,vy:0,ph:hash(c*219+i)*4,tx:x0,ty:sf+90,tt:1,face:1,hp:2,maxhp:2,home:x0,grp:g,ox:(i-n/2)*36+(hash(c*221+i)-0.5)*12,oy:(hash(c*223+i)-0.5)*50};g.m.push(e);solo.push(e);}}}
+  if(ow>0.05){if(hash(c*241+1)<0.28*ow){const n=6+Math.floor(hash(c*243)*4),g={x:x0,y:sf+80+hash(c*245)*150,vx:(hash(c*247)<0.5?-1:1)*14,home:x0,scat:0,t:-1,m:[]};for(let i=0;i<n;i++){const e={k:'mackerel',c,x:g.x+(hash(c*249+i)-0.5)*20,y:g.y+(hash(c*251+i)-0.5)*14,vx:g.vx,vy:0,ph:hash(c*253+i)*4,tt:1,face:1,hp:1,maxhp:1,home:x0,ball:g,ang:i/n*6.283,rad:6+hash(c*255+i)*10};g.m.push(e);solo.push(e);}}
+    if(hash(c*191+2)<0.2*ow){const n=4+Math.floor(hash(c*193)*3),dir=hash(c*197)<0.5?-1:1;let prev=null;for(let i=0;i<n;i++){const e={k:'flyingfish',c,x:x0-dir*i*14,y:sf+24,vx:dir*40,vy:0,ph:hash(c*199+i)*4,tx:x0,ty:sf+24,tt:1,face:dir,dir,hp:1,maxhp:1,home:x0,lead:prev,hist:[]};solo.push(e);prev=e;}}
+    if(hash(c*211+3)<0.14*ow){const n=3+Math.floor(hash(c*213)*2),g={tx:x0,ty:sf+90,tt:0,home:x0,m:[],t:-1};for(let i=0;i<n;i++){const e={k:'mahimahi',c,x:x0+(i-n/2)*34,y:sf+70+hash(c*217+i)*60,vx:0,vy:0,ph:hash(c*219+i)*4,tx:x0,ty:sf+90,tt:1,face:1,hp:2,maxhp:2,home:x0,grp:g,ox:(i-n/2)*36+(hash(c*221+i)-0.5)*12,oy:(hash(c*223+i)-0.5)*50};g.m.push(e);solo.push(e);}}}
   if(x0<WALLX+500&&hash(c*227+4)<0.7){const y=sf+60+hash(c*229)*500;solo.push({k:'sunfish',c,x:WALLX+30,y:Math.min(fl-30,y),vx:0,vy:0,ph:hash(c*231)*4,tx:WALLX+30,ty:y,tt:0,face:-1,hp:4,maxhp:4,wall:'L',home:x0});}
   if(Math.abs(x0-RVX)<=200&&hash(c*233+5)<0.6){const sd=hash(c*237)<0.5?-1:1,y=floorY(RVX)+40;solo.push({k:'sunfish',c,x:RVX+sd*20,y,vx:0,vy:0,ph:hash(c*239)*4,tx:RVX,ty:y,tt:0,face:-sd,hp:4,maxhp:4,wall:'R',side:sd,home:x0});}
-  if(kw>0.2){add('garibaldi',5,fl-170,fl-16,0.5*kw);add('kelpbass',6,sf+60,fl-40,0.4*kw);add('sheephead',7,fl-130,fl-16,0.3*kw);add('rockfish',8,fl-60,fl-10,0.35*kw);}
-  if(tw>0.3){const top=reefTop(x0);add('parrotfish',9,top,fl-8,0.45*tw);add('butterflyfish',10,top,fl-8,0.5*tw);add('bluetang',11,top,fl-8,0.45*tw);add('lionfish',12,top+10,fl-6,0.25*tw);}
+  if(kw>0.2){add('garibaldi',5,fl-170,fl-16,0.31*kw);add('kelpbass',6,sf+60,fl-40,0.25*kw);add('sheephead',7,fl-60,fl-12,0.19*kw);add('rockfish',8,fl-12,fl-6,0.22*kw);}
+  if(tw>0.3){const top=reefTop(x0);add('parrotfish',9,fl-30,fl-8,0.28*tw);
+    if(hash(c*261+1)<0.31*tw){const y=top+hash(c*263)*(fl-top-10),a={k:'butterflyfish',c,x:x0,y,vx:8,vy:0,ph:0,tx:x0,ty:y,tt:0,face:1,hp:1,maxhp:1,y0:top,y1:fl-8,home:x0},b={k:'butterflyfish',c,x:x0-8,y:y+3,vx:8,vy:0,ph:1.3,tt:0,face:1,hp:1,maxhp:1,home:x0,mate:a};a.mate=b;solo.push(a,b);}
+    if(hash(c*271+1)<0.28*tw){const n=3+Math.floor(hash(c*273)*3),g={tx:x0,ty:top+20,tt:0,home:x0,m:[],t:-1,tang:1};for(let i=0;i<n;i++){const e={k:'bluetang',c,x:x0+(i-n/2)*12,y:top+20+hash(c*277+i)*20,vx:0,vy:0,ph:hash(c*279+i)*4,tt:1,face:1,hp:1,maxhp:1,home:x0,grp:g,ox:(i-n/2)*13,oy:(hash(c*281+i)-0.5)*16};g.m.push(e);solo.push(e);}}
+    add('lionfish',12,top+10,fl-6,0.16*tw);}
   if(Math.abs(x0-RVX)<=200){for(let i=0;i<2;i++){if(hash(c*157+i*5)>=(i?0.5:0.9))continue;for(let q=0;q<8;q++){const x=RVX+(hash(c*163+i*31+q)-0.5)*CAVRX*1.3,y=CAVY+(hash(c*167+i*37+q)-0.5)*CAVRY*1.1;if(inCave(x,y)){const f=NF.anglerfish,face=hash(c*173+i)<0.5?-1:1;solo.push({k:'anglerfish',c,x,y,vx:face*3,vy:0,ph:hash(c*179+i)*4,tx:x,ty:y,tt:1,face,hp:f.hp,maxhp:f.hp,home:RVX});break;}}}}}
 const FLY_LAG=0.13;
 function flyPos(L,t){const h=L.hist;for(let i=h.length-1;i>=0;i--)if(h[i].t<=t)return h[i];return h.length?h[0]:null;}
@@ -1320,10 +1323,10 @@ function stepFly(e,dt,Tm){const f=NF.flyingfish,sf=surfY(e.x,Tm);let L=e.lead;wh
     e.x+=e.vx*dt;e.y+=e.vy*dt;e.air=e.y<sf-1||(e.air&&e.vy<0);}
   if(e.air!==wasAir)splash(e.x,sf,e.air?4:7,0.6);
   if(Math.abs(e.vx)>0.3)e.face=e.vx>0?1:-1;e.hist.push({x:e.x,y:e.y,t:Tm});if(e.hist.length>90)e.hist.splice(0,e.hist.length-90);}
-function stepMahi(e,dt,Tm){const f=NF.mahimahi,g=e.grp,sf=surfY(e.x,Tm),fl=floorY(e.x);g.m=g.m.filter(m=>solo.includes(m));
-  if(g.t!==Tm){g.t=Tm;g.tt-=dt;const ow=1-tropLook(g.tx)-kelpLook(g.tx);if(g.tt<=0||ow<0.4){g.tx=(ow<0.4?g.home:g.tx)+(Math.random()-0.5)*600;if(g.tx<WALLX+160)g.tx=WALLX+160;g.ty=surfY(g.tx,0)+40+Math.random()*170;g.tt=4+Math.random()*4;}}
-  steer(e,g.tx+e.ox,g.ty+e.oy,f.sp*0.75,dt,1);
-  for(const m of g.m){if(m===e)continue;const dx=e.x-m.x,dy=e.y-m.y,d=Math.hypot(dx,dy)||1;if(d<34){const k=(34-d)/34*90*dt;e.vx+=dx/d*k;e.vy+=dy/d*k;}}
+function stepMahi(e,dt,Tm){const f=NF[e.k],tg=!!e.grp.tang,SEP=tg?12:34,g=e.grp,sf=surfY(e.x,Tm),fl=floorY(e.x);g.m=g.m.filter(m=>solo.includes(m));
+  if(g.t!==Tm){g.t=Tm;g.tt-=dt;const ow=tg?tropLook(g.tx):1-tropLook(g.tx)-kelpLook(g.tx);if(g.tt<=0||ow<0.4){g.tx=(ow<0.4?g.home:g.tx)+(Math.random()-0.5)*(tg?260:600);if(g.tx<WALLX+160)g.tx=WALLX+160;if(tg){const fl=floorY(g.tx),tp=reefTop(g.tx);g.ty=tp+10+Math.random()*Math.max(10,fl-tp-25);g.tt=2+Math.random()*3;}else{g.ty=surfY(g.tx,0)+40+Math.random()*170;g.tt=4+Math.random()*4;}}}
+  steer(e,g.tx+e.ox,g.ty+e.oy,f.sp*(tg?1:0.75),dt,tg?2:1);
+  for(const m of g.m){if(m===e)continue;const dx=e.x-m.x,dy=e.y-m.y,d=Math.hypot(dx,dy)||1;if(d<SEP){const k=(SEP-d)/SEP*90*dt;e.vx+=dx/d*k;e.vy+=dy/d*k;}}
   if(e.y<sf+12)e.vy+=50*dt;if(e.y>fl-10)e.vy-=50*dt;
   const m=f.sp*1.1,v=Math.hypot(e.vx,e.vy);if(v>m){e.vx*=m/v;e.vy*=m/v;}e.x+=e.vx*dt;e.y+=e.vy*dt;if(Math.abs(e.vx)>0.3)e.face=e.vx>0?1:-1;}
 function stepMola(e,dt,Tm){const f=NF.sunfish;e.tt-=dt;
@@ -1332,7 +1335,58 @@ function stepMola(e,dt,Tm){const f=NF.sunfish;e.tt-=dt;
     else{const sd=e.side||1;for(let q=0;q<6;q++){const y=floorY(RVX)-50+Math.random()*260,x=y>1610?(sd<0?crkL(y)+14:crkR(y)-14):RVX+sd*(crkW(1600)+24+Math.random()*30);if(isOpen(x,y)){e.tx=x;e.ty=y;break;}}}
     e.tt=4+Math.random()*5;}
   steer(e,e.tx,e.ty,f.sp,dt,0.5);const nx=e.x+e.vx*dt,ny=e.y+e.vy*dt;if(isOpen(nx,ny)&&ny>surfY(nx,Tm)+10){e.x=nx;e.y=ny;}else{e.vx*=-0.4;e.vy*=-0.4;e.tt=0;}if(Math.abs(e.vx)>0.5)e.face=e.vx>0?1:-1;}
-function stepNewFish(e,dt,Tm){const f=NF[e.k];if(e.k==='flyingfish'&&e.hist)return stepFly(e,dt,Tm);if(e.k==='mahimahi'&&e.grp)return stepMahi(e,dt,Tm);if(e.k==='sunfish'&&e.wall)return stepMola(e,dt,Tm);e.tt-=dt;
+// V63 per-species behaviors
+function nfDiver(){return DV.on&&!inSub();}
+function nfPuff(x,y,n){for(let i=0;i<n;i++)spawn(x+(Math.random()-0.5)*4,y,(Math.random()-0.5)*14,-4-Math.random()*8,0.7+Math.random()*0.6,4);}
+function nfMove(e,dt,mx,Tm){const sf=surfY(e.x,Tm),fl=floorY(e.x);if(e.y<sf+8)e.vy+=50*dt;if(e.y>fl-4)e.vy-=60*dt;if(e.x<WALLX+50)e.vx+=40*dt;const v=Math.hypot(e.vx,e.vy);if(v>mx){e.vx*=mx/v;e.vy*=mx/v;}e.x+=e.vx*dt;e.y+=e.vy*dt;if(Math.abs(e.vx)>0.3)e.face=e.vx>0?1:-1;}
+function stepMack(e,dt,Tm){const g=e.ball,f=NF.mackerel;g.m=g.m.filter(m=>solo.includes(m));
+  if(g.t!==Tm){g.t=Tm;const ow=1-tropLook(g.x)-kelpLook(g.x);if(ow<0.4||g.x<WALLX+150||Math.abs(g.x-g.home)>500)g.vx=(g.x<g.home?1:-1)*14;g.x+=g.vx*dt;g.y=Math.max(surfY(g.x,0)+40,g.y+Math.sin(Tm*0.4+g.home)*6*dt);
+    if(nfDiver()&&Math.hypot(DV.x-g.x,DV.y-g.y)<60)g.scat=Tm+2.5;}
+  if(Tm<g.scat){const dx=e.x-DV.x,dy=e.y-DV.y,d=Math.hypot(dx,dy)||1;e.vx+=dx/d*160*dt;e.vy+=dy/d*120*dt;nfMove(e,dt,f.sp*1.6,Tm);return;}
+  e.ang+=dt*(1.6+e.rad*0.05);steer(e,g.x+Math.cos(e.ang)*e.rad,g.y+Math.sin(e.ang)*e.rad*0.55,f.sp,dt,3);nfMove(e,dt,f.sp*1.2,Tm);}
+function stepGari(e,dt,Tm){const f=NF.garibaldi;e.hx=e.hx==null?e.x:e.hx;e.hy=e.hy==null?e.y:e.hy;e.cd=e.cd||0;
+  if(e.dart>Tm){steer(e,DV.x,DV.y,52,dt,6);if(nfDiver()&&Math.hypot(DV.x-e.x,DV.y-e.y)<8){DV.vx+=(e.face||1)*25;e.dart=0;cageMsg('GARIBALDI: GET OUT OF MY KELP!',Tm,1.2);}nfMove(e,dt,55,Tm);return;}
+  if(nfDiver()&&Tm>e.cd&&Math.hypot(DV.x-e.hx,DV.y-e.hy)<70){e.dart=Tm+0.7;e.cd=Tm+3;return;}
+  e.tt-=dt;if(e.tt<=0){e.tx=e.hx+(Math.random()-0.5)*40;e.ty=e.hy+(Math.random()-0.5)*20;e.tt=1+Math.random()*2;}steer(e,e.tx,e.ty,f.sp,dt,1.5);nfMove(e,dt,f.sp*1.5,Tm);}
+function stepBass(e,dt,Tm){const f=NF.kelpbass;
+  if(e.hide==null||e.tt<=0){const ks=kelpStalks(0,e.x-160,e.x+160);let b=null,bd=1e9;for(const k of ks){const d=Math.abs(k.x-e.x);if(d<bd){bd=d;b=k;}}e.hide=b?b.x+(Math.random()<0.5?-4:4):e.x;e.hy=Math.min(floorY(e.hide)-12,(b?floorY(b.x)-b.h*(0.2+Math.random()*0.5):e.y));e.tt=8+Math.random()*6;}
+  e.tt-=dt;
+  if(e.lunge>Tm){nfMove(e,dt,70,Tm);return;}
+  if(Tm>(e.cd||0)){const s=schools.get(Math.floor(e.x/500));if(s)for(let i=0;i<s.fish.length;i++){const q=s.fish[i];const d=Math.hypot(q.x-e.x,q.y-e.y);if(d<45){const n=d||1;e.vx=(q.x-e.x)/n*70;e.vy=(q.y-e.y)/n*70;e.lunge=Tm+0.35;e.cd=Tm+5;if(d<20){s.fish.splice(i,1);bleed(q.x,q.y,2);}return;}}
+    if(nfDiver()&&Math.hypot(DV.x-e.x,DV.y-e.y)<35){const dx=DV.x-e.x,dy=DV.y-e.y,n=Math.hypot(dx,dy)||1;e.vx=dx/n*65;e.vy=dy/n*65;e.lunge=Tm+0.3;e.cd=Tm+4;e.tt=0.4;return;}}
+  steer(e,e.hide,e.hy+Math.sin(Tm*0.8+e.ph)*3,f.sp*0.6,dt,2);nfMove(e,dt,f.sp,Tm);}
+function stepSheep(e,dt,Tm){const f=NF.sheephead,fl=floorY(e.x);
+  if(e.poke>Tm){e.vx*=Math.exp(-6*dt);e.vy=0;e.y+=(fl-7-e.y)*Math.min(1,4*dt);e.tilt=(e.face||1)*0.5;if(Math.random()<dt*6)nfPuff(e.x+(e.face||1)*8,fl-1,2);return;}
+  e.tt-=dt;let tgt=null;for(const k of crabs){if(Math.abs(k.x-e.x)<70&&!(k.hideT>Tm)){tgt=k;break;}}
+  if(tgt){steer(e,tgt.x-(e.face||1)*8,floorY(tgt.x)-7,f.sp,dt,2);if(Math.abs(tgt.x-e.x)<12){e.poke=Tm+1.6;tgt.hideT=Tm+4;e.tt=2;}}
+  else{if(e.tt<=0){e.tx=e.x+(Math.random()-0.5)*200;if(kelpLook(e.tx)<0.3)e.tx=e.home;e.tt=2+Math.random()*3;if(Math.random()<0.5){e.poke=Tm+1.2;return;}}steer(e,e.tx,floorY(e.tx)-9,f.sp*0.7,dt,1.2);}
+  nfMove(e,dt,f.sp,Tm);}
+function stepRock(e,dt,Tm){const f=NF.rockfish,fl=floorY(e.x);
+  if(e.bolt>Tm){nfMove(e,dt,60,Tm);e.camo=0;return;}
+  if(nfDiver()&&Math.hypot(DV.x-e.x,DV.y-e.y)<40&&Tm>(e.cd||0)){const dx=e.x-DV.x,n=Math.abs(dx)||1;e.vx=dx/n*60;e.vy=-20;e.bolt=Tm+0.9;e.cd=Tm+3;nfPuff(e.x,fl-1,5);return;}
+  e.vx*=Math.exp(-4*dt);e.vy=0;e.y+=(fl-6-e.y)*Math.min(1,3*dt);e.x+=e.vx*dt;e.camo=1;e.tilt=0;}
+function stepParrot(e,dt,Tm){const f=NF.parrotfish,fl=floorY(e.x);
+  if(e.nib>Tm){e.vx*=Math.exp(-5*dt);e.vy=0;e.y+=(fl-7-e.y)*Math.min(1,4*dt);e.tilt=(e.face||1)*0.35;if(Tm>(e.pt||0)){e.pt=Tm+0.35;nfPuff(e.x+(e.face||1)*8,fl-2,2);}return;}
+  e.tt-=dt;if(e.tt<=0){e.tx=e.x+(Math.random()-0.5)*180;if(tropLook(e.tx)<0.3)e.tx=e.home;e.tt=2+Math.random()*2.5;if(Math.random()<0.6){e.nib=Tm+2+Math.random()*2;return;}}
+  steer(e,e.tx,fl-12,f.sp,dt,1.3);nfMove(e,dt,f.sp*1.3,Tm);}
+function stepBfly(e,dt,Tm){const f=NF.butterflyfish,m=e.mate&&solo.includes(e.mate)&&!e.mate.onHook?e.mate:null;
+  if(m&&!m.mate)m.mate=e;
+  if(m&&m.y0===undefined&&e.y0!==undefined){}// leader has y0
+  if(m&&e.y0===undefined){steer(e,m.x-(m.face||1)*7,m.y+3+Math.sin(Tm*2+e.ph)*1.5,f.sp*1.3,dt,3);nfMove(e,dt,f.sp*1.6,Tm);return;}
+  e.tt-=dt;if(e.tt<=0){e.tx=e.x+(Math.random()-0.5)*160;if(tropLook(e.tx)<0.3)e.tx=e.home;const tp=reefTop(e.tx),fl=floorY(e.tx);e.ty=tp+Math.random()*Math.max(10,fl-tp-10);e.tt=1.5+Math.random()*2.5;}
+  steer(e,e.tx,e.ty,f.sp,dt,1.2);nfMove(e,dt,f.sp*1.3,Tm);}
+function stepLion(e,dt,Tm){const f=NF.lionfish;e.tt-=dt;if(e.tt<=0){e.tx=e.x+(Math.random()-0.5)*80;if(tropLook(e.tx)<0.3)e.tx=e.home;const tp=reefTop(e.tx),fl=floorY(e.tx);e.ty=tp+10+Math.random()*Math.max(10,fl-tp-16);e.tt=3+Math.random()*4;}
+  steer(e,e.tx,e.ty,f.sp,dt,0.5);nfMove(e,dt,f.sp,Tm);
+  if(nfDiver()&&Math.hypot(DV.x-e.x,DV.y-e.y)<9&&Tm>(e.sting||0)){e.sting=Tm+2.5;hurt(Tm);DV.stungT=Math.max(DV.stungT||0,Tm+1.2);const dx=DV.x-e.x,n=Math.hypot(dx,DV.y-e.y)||1;DV.vx+=dx/n*30;cageMsg('OUCH! LIONFISH SPINES',Tm,1.4);}}
+function stepAngler(e,dt,Tm){const f=NF.anglerfish,lx=e.x+(e.face||1)*9,ly=e.y-3;
+  for(const [,s] of schools)for(let i=s.fish.length-1;i>=0;i--){const q=s.fish[i],d=Math.hypot(q.x-lx,q.y-ly);if(d<130){q.vx+=(lx-q.x)/(d||1)*30*dt;q.vy+=(ly-q.y)/(d||1)*30*dt;if(d<10&&Tm>(e.cd||0)){s.fish.splice(i,1);e.lunge=Tm+0.25;e.cd=Tm+2;bleed(q.x,q.y,2);}}}
+  if(e.lunge>Tm){const nx=e.x+e.vx*dt,ny=e.y+e.vy*dt;if(isOpen(nx,ny)){e.x=nx;e.y=ny;}else e.lunge=0;if(nfDiver()&&Math.hypot(DV.x-e.x-(e.face||1)*8,DV.y-e.y)<11&&!e.bit){e.bit=1;hurt(Tm);cageMsg('THE ANGLERFISH BIT YOU!',Tm,1.4);}return;}
+  if(nfDiver()){const dx=DV.x-e.x,dy=DV.y-e.y,d=Math.hypot(dx,dy);if(d<130&&Math.random()<dt*2)e.vx=(dx>0?1:-1)*0.5;if(d<120)e.face=dx>0?1:-1;
+    if(d<38&&Tm>(e.cd||0)){e.vx=dx/(d||1)*95;e.vy=dy/(d||1)*95;e.lunge=Tm+0.35;e.cd=Tm+5;e.bit=0;return;}
+    if(d<120){e.vx*=Math.exp(-3*dt);e.vy*=Math.exp(-3*dt);return;}}
+  return 1;}
+function stepNewFish(e,dt,Tm){const f=NF[e.k];
+  if(e.k==='mackerel'&&e.ball)return stepMack(e,dt,Tm);if(e.k==='garibaldi')return stepGari(e,dt,Tm);if(e.k==='kelpbass')return stepBass(e,dt,Tm);if(e.k==='sheephead')return stepSheep(e,dt,Tm);if(e.k==='rockfish')return stepRock(e,dt,Tm);if(e.k==='parrotfish')return stepParrot(e,dt,Tm);if(e.k==='butterflyfish')return stepBfly(e,dt,Tm);if(e.k==='lionfish')return stepLion(e,dt,Tm);if(e.k==='anglerfish'&&!stepAngler(e,dt,Tm))return;if(e.k==='flyingfish'&&e.hist)return stepFly(e,dt,Tm);if(e.grp)return stepMahi(e,dt,Tm);if(e.k==='sunfish'&&e.wall)return stepMola(e,dt,Tm);e.tt-=dt;
   if(e.k==='anglerfish'){if(e.tt<=0||Math.hypot(e.tx-e.x,e.ty-e.y)<10){for(let q=0;q<8;q++){const tx=RVX+(Math.random()-0.5)*CAVRX*1.4,ty=CAVY+(Math.random()-0.5)*CAVRY*1.2;if(inCave(tx,ty)){e.tx=tx;e.ty=ty;break;}}e.tt=3+Math.random()*4;}
     steer(e,e.tx,e.ty,f.sp,dt,0.6);const nx=e.x+e.vx*dt,ny=e.y+e.vy*dt;if(!isOpen(nx,ny)){e.vx*=-0.5;e.vy*=-0.5;e.tt=0;}else{e.x=nx;e.y=ny;}if(Math.abs(e.vx)>0.3)e.face=e.vx>0?1:-1;return;}
   const sf=surfY(e.x,Tm),fl=floorY(e.x);
