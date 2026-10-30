@@ -532,6 +532,22 @@ function grabSheet(src,fw,cb){const im=new Image();im.onload=()=>{try{const n=Ma
 const DOLPHIN_SPR={swim:"sprites/dolphin/dolphin_swim.png",right:"sprites/dolphin/dolphin.png",left:"sprites/dolphin/dolphin_left.png",fw:94};
 function loadReefFish(){grabSheet("sprites/fish/clownfish_swim.png",48,fr=>{reefImg.swim=fr;});grabSheet("sprites/fish/puffer.png",56,fr=>{reefImg.right=fr&&fr[0];});grabSheet("sprites/fish/puffer_left.png",56,fr=>{reefImg.left=fr&&fr[0];});grabSheet(DOLPHIN_SPR.swim,DOLPHIN_SPR.fw,fr=>{reefImg.dswim=fr;});grabSheet(DOLPHIN_SPR.right,DOLPHIN_SPR.fw,fr=>{reefImg.dright=fr&&fr[0];});grabSheet(DOLPHIN_SPR.left,DOLPHIN_SPR.fw,fr=>{reefImg.dleft=fr&&fr[0];});}
 loadReefFish();
+// ---- V68 whale: one big blue whale cruising 50-100m; surfaces to breathe every ~5 min
+const WHFW=184,WHS={swim:null};grabSheet("sprites/whale/whale_swim.png",WHFW,f=>{WHS.swim=f;});
+const WH_BREATHE=300,WH_Y0=500,WH_Y1=1000;
+const WH={x:0,y:750,vx:-16,vy:0,ty:750,st:-1,nb:0,hold:0,mT:-99,eat:0,ang:0,face:-1};
+function whTy(){return WH_Y0+Math.random()*(WH_Y1-WH_Y0);}
+function updWhale(dt,T){if(WH.st<0){WH.x=B.x+(Math.random()<0.5?-1:1)*(400+Math.random()*1400);WH.y=whTy();WH.ty=whTy();WH.st=0;WH.nb=T+WH_BREATHE;WH.face=Math.random()<0.5?-1:1;}
+  if(WH.st===0){if(Math.random()<dt*0.04)WH.ty=whTy();if(Math.random()<dt*0.02)WH.face=-WH.face;if(T>WH.nb)WH.st=1;}
+  let tgt=WH.ty;if(WH.st===1){tgt=surfY(WH.x,T)+14;if(WH.y<tgt+4){WH.st=2;WH.hold=T+5;}}else if(WH.st===2){tgt=surfY(WH.x,T)+14;if(Math.random()<dt*3)spawn(WH.x-WH.face*-60,surfY(WH.x,T)-2,(Math.random()-0.5)*6,-22-Math.random()*10,0.6,2);if(T>WH.hold){WH.st=3;WH.ty=whTy();}}else if(WH.st===3){tgt=WH.ty;if(Math.abs(WH.y-WH.ty)<10){WH.st=0;WH.nb=T+WH_BREATHE;}}
+  const fy=floorY(WH.x)-80;if(tgt>fy)tgt=fy;
+  const sp=WH.st===1||WH.st===3?24:16;WH.vx+=(WH.face*sp-WH.vx)*Math.min(1,dt*0.6);
+  const dvy=Math.max(-14,Math.min(14,(tgt-WH.y)*(WH.st===1||WH.st===3?0.35:0.12)));WH.vy+=(dvy-WH.vy)*Math.min(1,dt*0.8);
+  const nx=WH.x+WH.vx*dt;if(!isOpen(nx+WH.face*90,WH.y)){WH.face=-WH.face;}else WH.x=nx;WH.y+=WH.vy*dt;
+  WH.ang+=(Math.max(-0.35,Math.min(0.35,Math.atan2(WH.vy,Math.abs(WH.vx)+1)))-WH.ang)*Math.min(1,dt*2);
+}
+function drawWhale(T){const sx=WH.x-cx,sy=WH.y-cy;if(sx<-200||sx>W+200||sy<-160||sy>H+160)return;let im=null;if(WHS.swim)im=WHS.swim[((Math.floor(T/0.11)%16)+16)%16];
+  blitReef(im,sx,sy,WH.face>0,WH.face>0?WH.ang:-WH.ang,T,1,false,false);}
 const nfImg={};function loadNewFish(){for(const k in NF)grabSheet("sprites/newfish/"+k+"_swim.png",NF[k].w,fr=>{nfImg[k]=fr;});}loadNewFish();
 function blitReef(im,sx,sy,mirror,ang,Tm,sc,flash,edgeFade){if(!im)return false;sc=sc||1;ang=ang||0;const w=im.w,h=im.h,c=Math.cos(ang),sn=Math.sin(ang),hw=w/2,hh=h/2,R=Math.ceil(Math.hypot(hw,hh)*sc)+1,dim=flash?1:(0.68+0.32*(typeof DAYK==="number"?DAYK:1)),fade=typeof edgeFade==='number'?edgeFade:edgeFade?tropLook(sx+cx):1;
   for(let dy=-R;dy<=R;dy++)for(let dx=-R;dx<=R;dx++){let X=Math.floor((c*dx+sn*dy)/sc+hw),Y=Math.floor((-sn*dx+c*dy)/sc+hh);if(X<0||X>=w||Y<0||Y>=h)continue;if(mirror)X=w-1-X;const i=(Y*w+X)*4;if(im.d[i+3]<128)continue;
@@ -737,7 +753,7 @@ const F={B:"110101110101110",G:"111100101101111",J:"001001001101111",K:"10110111
 function text(s,x,y,c){for(const ch of s){const g=F[ch]||F[" "];for(let i=0;i<15;i++)if(g[i]=="1")put(x+i%3,y+(i/3|0),c);x+=4;}}
 function text2x(s,x,y,c){for(const ch of s){const g=F[ch]||F[" "];for(let i=0;i<15;i++)if(g[i]=="1"){const px=x+(i%3)*2,py=y+(i/3|0)*2;put(px,py,c);put(px+1,py,c);put(px,py+1,c);put(px+1,py+1,c);}x+=8;}}
 function fleeRot(o,dx,dy,d,T,dt){if(!((o.fleeT||0)>T)||o.fa===undefined){o.fa=(Math.random()*2-1)*0.175;o.ft=0;}o.ft=Math.max(-0.175,Math.min(0.175,(o.ft||0)+(Math.random()*2-1)*0.6*dt));const a=o.fa+o.ft,c=Math.cos(a),n=Math.sin(a),ux=dx/d,uy=dy/d;return[ux*c-uy*n,ux*n+uy*c];}
-const VER="V67";
+const VER="V68";
 function textA(s,x,y,c,a){for(const ch of s){const g=F[ch]||F[" "];for(let i=0;i<15;i++)if(g[i]=="1"){const px=x+(i%3),py=y+(i/3|0);if(px>=0&&px<W&&py>=0&&py<H){const dst=buf[py*W+px],src=P32[c],dr=dst&255,dg=(dst>>8)&255,db=(dst>>16)&255,sr=src&255,sg=(src>>8)&255,sb=(src>>16)&255;const r=(dr+(sr-dr)*a)|0,g2=(dg+(sg-dg)*a)|0,b=(db+(sb-db)*a)|0;buf[py*W+px]=0xff000000|(b<<16)|(g2<<8)|r;}}x+=4;}}
 function drawVer(){const s=VER;textA(s,W-2-s.length*4,H-7,10,0.5);}
 const FD={" ":"00000000000000000000000000000000000",A:"01110100011000111111100011000110001",B:"11110100011000111110100011000111110",C:"01111100001000010000100001000001111",D:"11110100011000110001100011000111110",E:"11111100001000011110100001000011111",F:"11111100001000011110100001000010000",G:"01111100001000010111100011000101110",H:"10001100011000111111100011000110001",I:"11111001000010000100001000010011111",J:"00111000100001000010000101001001100",K:"10001100101010011000101001001010001",L:"10000100001000010000100001000011111",M:"10001110111010110101100011000110001",N:"10001110011010110011100011000110001",O:"01110100011000110001100011000101110",P:"11110100011000111110100001000010000",Q:"01110100011000110001101011001001101",R:"11110100011000111110101001001010001",S:"01111100001000001110000010000111110",T:"11111001000010000100001000010000100",U:"10001100011000110001100011000101110",V:"10001100011000110001100010101000100",W:"10001100011000110101101011010101010",X:"10001100010101000100010101000110001",Y:"10001100010101000100001000010000100",Z:"11111000010001000100010001000011111","0":"01110100011001110101110011000101110","1":"00100011000010000100001000010001110","2":"01110100010000100010001000100011111","3":"11110000010000101110000010000111110","4":"10001100011000111111000010000100001","5":"11111100001000011110000010000111110","6":"01110100001000011110100011000101110","7":"11111000010001000100010000100001000","8":"01110100011000101110100011000101110","9":"01110100011000101111000010000101110","!":"00100001000010000100001000000000100",".":"00000000000000000000000000000000100",",":"00000000000000000000000000010001000","?":"01110100010000100010001000000000100","'":"00100001000000000000000000000000000","-":"00000000000000011111000000000000000","/":"00001000100001000100010000100010000","[":"01110010000100001000010000100001110","]":"01110000100001000010000100001001110","%":"11001110100001000100010000101110011",":":"00000001000000000000000000010000000"};
@@ -1462,7 +1478,7 @@ function stepReefFish(e,dt,Tm){
 let last=performance.now(),T=DAY_CYCLE*0.45;loadDeck();
 let frameErr=0;function frame(now){try{frame0(now);}catch(e){if(!frameErr){frameErr=1;console.warn('frame error (logged once):',e);}last=now;}requestAnimationFrame(frame);}
 function frame0(now){const dt=Math.min(0.05,(now-last)/1000);last=now;T+=dt;
-  physics(dt,T);if(HOLD){B.x=HOLD.x;B.y=HOLD.y;B.vx=B.vy=0;cx=B.x-W/2;cy=B.y-H/2;}updDrop(dt,T);updTurn(dt);updNet(dt,T);updFish(dt,T);updSchools(dt,T);updSea(dt,T);updGulls(dt,T);updCrabs(dt,T);updUrchins(dt,T);updChum(dt,T);updCages(dt,T);updJelly(dt,T);updFreeKing(dt,T);updBoss(dt,T);updDiver(dt,T);updSubHarp(dt,T);updFeed(dt,T);
+  physics(dt,T);if(HOLD){B.x=HOLD.x;B.y=HOLD.y;B.vx=B.vy=0;cx=B.x-W/2;cy=B.y-H/2;}updDrop(dt,T);updTurn(dt);updNet(dt,T);updFish(dt,T);updSchools(dt,T);updWhale(dt,T);updSea(dt,T);updGulls(dt,T);updCrabs(dt,T);updUrchins(dt,T);updChum(dt,T);updCages(dt,T);updJelly(dt,T);updFreeKing(dt,T);updBoss(dt,T);updDiver(dt,T);updSubHarp(dt,T);updFeed(dt,T);
   const ox=Math.floor(cx),oy=Math.floor(cy);
   // water + sky + surface. Day, night, and the lagoon tint live in seaPixel.
   DAYK=dayK(T);
@@ -1521,7 +1537,7 @@ function frame0(now){const dt=Math.min(0.05,(now-last)/1000);last=now;T+=dt;
   for(const s of kelpStalks(1,cx-40,cx+W+40))drawKelp(s,T,1,true);
   drawSeagrass(T);drawKelpFloor(T);drawFloatKelp(T);
   drawCorals(T);drawRavLip(T,ox,oy);
-  drawCages(T);drawCrabs(T);drawUrchins(T);drawCliff(T);const sqb=drawSquid(T);drawSchools(T);drawSea(T);drawJelly(T);drawFreeKing(T);drawBoss(T);drawParts();drawGulls(T);drawPark(T);drawBoat();drawSubHarp();drawNet(T);drawDropBoat();drawChum(T);drawDiver(T);drawFeed(T);drawPrompt(T,sqb-SQWL*(1+0.1*pulse)-2);drawBubble(T,sqb-SQWL*(1+0.1*pulse)-2);drawDark(T);drawFlashGlow(T);drawGoggleGlow(T);drawBossGlow(T);drawBoatMarker(T);
+  drawCages(T);drawCrabs(T);drawUrchins(T);drawCliff(T);const sqb=drawSquid(T);drawWhale(T);drawSchools(T);drawSea(T);drawJelly(T);drawFreeKing(T);drawBoss(T);drawParts();drawGulls(T);drawPark(T);drawBoat();drawSubHarp();drawNet(T);drawDropBoat();drawChum(T);drawDiver(T);drawFeed(T);drawPrompt(T,sqb-SQWL*(1+0.1*pulse)-2);drawBubble(T,sqb-SQWL*(1+0.1*pulse)-2);drawDark(T);drawFlashGlow(T);drawGoggleGlow(T);drawBossGlow(T);drawBoatMarker(T);
   nearSquid=DV.on?(Math.abs(DV.x-SQX)<120&&DV.y<surfY(SQX,T)+200):(Math.abs(B.x-SQX)<130&&B.y<40);
   updAmbAudio(dt,T);drawUwTint();
   // depth meter (same DEPTH/SPD panel; while rod cast show hook depth)
