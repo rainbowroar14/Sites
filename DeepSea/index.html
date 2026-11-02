@@ -15,6 +15,19 @@ canvas{position:absolute;left:50%;top:50%;transform:translate(-50%,-50%);image-r
 #fs{position:fixed;right:8px;top:8px;font:bold 12px monospace;letter-spacing:1px;color:#f8fbff;background:#0a1830;border:2px solid #a8e0dc;padding:3px 6px;cursor:pointer;image-rendering:pixelated;z-index:2}</style></head>
 <body><canvas id="c" width="320" height="180"></canvas><button id="fs">FULLSCREEN</button>
 <script>
+// ---- V69 main menu gate: while MENU is on, capture-phase listeners swallow all game input
+let MENU=1,MENU_HOV=0,MENU_PRESS=0,MENU_T=0,MENU_LAST=0;
+function menuBtnHit(e){const c=document.getElementById('c');if(!c||e.clientX===undefined)return false;const r=c.getBoundingClientRect(),x=(e.clientX-r.left)*c.width/r.width,y=(e.clientY-r.top)*c.height/r.height,bw=70,bh=20,bx=Math.round(c.width/2-bw/2),by=Math.round(c.height*0.62);return x>=bx-4&&x<=bx+bw+4&&y>=by-4&&y<=by+bh+4;}
+function menuStart(){if(!MENU)return;MENU=0;MENU_PRESS=0;try{unlockAudio();}catch(e){}try{playUI('confirm');}catch(e){}try{last=performance.now();}catch(e){}try{const c=document.getElementById('c');c.style.cursor='';}catch(e){}}
+function menuSwallow(e){if(!MENU)return;if(e.target&&e.target.id==='fs')return;e.stopImmediatePropagation();
+  if(e.type==='keydown'){if(e.code==='Enter'||e.code==='Space'||e.code==='NumpadEnter'){e.preventDefault();if(!e.repeat)MENU_PRESS=1;}}
+  else if(e.type==='keyup'){if((e.code==='Enter'||e.code==='Space'||e.code==='NumpadEnter')&&MENU_PRESS){e.preventDefault();menuStart();}}
+  else if(e.type==='pointermove'||e.type==='mousemove'){MENU_HOV=menuBtnHit(e)?1:0;try{document.getElementById('c').style.cursor=MENU_HOV?'pointer':'';}catch(_){}}
+  else if(e.type==='pointerdown'){if(menuBtnHit(e)){MENU_PRESS=1;MENU_HOV=1;}if(e.cancelable)e.preventDefault();}
+  else if(e.type==='pointerup'){if(MENU_PRESS&&menuBtnHit(e))menuStart();else MENU_PRESS=0;}
+  else if(e.type==='touchstart'||e.type==='touchend'||e.type==='contextmenu'||e.type==='wheel'){if(e.cancelable)e.preventDefault();}}
+for(const ty of ['keydown','keyup','pointerdown','pointerup','pointermove','mousedown','mouseup','mousemove','click','touchstart','touchend','wheel','contextmenu'])window.addEventListener(ty,menuSwallow,{capture:true,passive:false});
+
 "use strict";
 let W=320;const BASE_H=180;let H=BASE_H;const WD=1800;let camZ=1;
 // palette (10): navy..teal, foam, kelp, rock, sand
@@ -383,7 +396,7 @@ function updSchools(dt,T){const c0=Math.floor((cx-250)/500),c1=Math.floor((cx+W+
   // tiny sardine formation schools (denser chunks, giant groups)
   const sc0=Math.floor((cx-300)/360),sc1=Math.floor((cx+W+300)/360);
   for(let c=sc0;c<=sc1;c++){if(sardSchools.has(c))continue;const h=hash(c*53+3);const s={c,fish:[],form:Math.floor(hash(c*53+4)*3)};sardSchools.set(c,s);
-    if(h>0.13||c*360+180<WALLX+80||hash(c*53+5)<tropLook(c*360+180)*0.85)continue;
+    if(h>0.22||c*360+180<WALLX+80||hash(c*53+5)<tropLook(c*360+180)*0.85)continue;
     const n=60+Math.floor(hash(c*53+6)*60),x0=c*360+180,y0=55+hash(c*53+7)*200,dir=hash(c*53+8)<0.5?-1:1;
     s.tx=x0;s.ty=y0;s.seed=c*2.3;s.vx=dir*(14+hash(c*53+9)*10);s.vy=0;
     for(let i=0;i<n;i++){const [ox,oy]=formOff(s.form,i,n,s.seed);s.fish.push({x:x0+ox,y:y0+oy,ox,oy,ph:hash(c*17+i)*4,i});}}
@@ -753,7 +766,7 @@ const F={B:"110101110101110",G:"111100101101111",J:"001001001101111",K:"10110111
 function text(s,x,y,c){for(const ch of s){const g=F[ch]||F[" "];for(let i=0;i<15;i++)if(g[i]=="1")put(x+i%3,y+(i/3|0),c);x+=4;}}
 function text2x(s,x,y,c){for(const ch of s){const g=F[ch]||F[" "];for(let i=0;i<15;i++)if(g[i]=="1"){const px=x+(i%3)*2,py=y+(i/3|0)*2;put(px,py,c);put(px+1,py,c);put(px,py+1,c);put(px+1,py+1,c);}x+=8;}}
 function fleeRot(o,dx,dy,d,T,dt){if(!((o.fleeT||0)>T)||o.fa===undefined){o.fa=(Math.random()*2-1)*0.175;o.ft=0;}o.ft=Math.max(-0.175,Math.min(0.175,(o.ft||0)+(Math.random()*2-1)*0.6*dt));const a=o.fa+o.ft,c=Math.cos(a),n=Math.sin(a),ux=dx/d,uy=dy/d;return[ux*c-uy*n,ux*n+uy*c];}
-const VER="V68";
+const VER="V69";
 function textA(s,x,y,c,a){for(const ch of s){const g=F[ch]||F[" "];for(let i=0;i<15;i++)if(g[i]=="1"){const px=x+(i%3),py=y+(i/3|0);if(px>=0&&px<W&&py>=0&&py<H){const dst=buf[py*W+px],src=P32[c],dr=dst&255,dg=(dst>>8)&255,db=(dst>>16)&255,sr=src&255,sg=(src>>8)&255,sb=(src>>16)&255;const r=(dr+(sr-dr)*a)|0,g2=(dg+(sg-dg)*a)|0,b=(db+(sb-db)*a)|0;buf[py*W+px]=0xff000000|(b<<16)|(g2<<8)|r;}}x+=4;}}
 function drawVer(){const s=VER;textA(s,W-2-s.length*4,H-7,10,0.5);}
 const FD={" ":"00000000000000000000000000000000000",A:"01110100011000111111100011000110001",B:"11110100011000111110100011000111110",C:"01111100001000010000100001000001111",D:"11110100011000110001100011000111110",E:"11111100001000011110100001000011111",F:"11111100001000011110100001000010000",G:"01111100001000010111100011000101110",H:"10001100011000111111100011000110001",I:"11111001000010000100001000010011111",J:"00111000100001000010000101001001100",K:"10001100101010011000101001001010001",L:"10000100001000010000100001000011111",M:"10001110111010110101100011000110001",N:"10001110011010110011100011000110001",O:"01110100011000110001100011000101110",P:"11110100011000111110100001000010000",Q:"01110100011000110001101011001001101",R:"11110100011000111110101001001010001",S:"01111100001000001110000010000111110",T:"11111001000010000100001000010000100",U:"10001100011000110001100011000101110",V:"10001100011000110001100010101000100",W:"10001100011000110101101011010101010",X:"10001100010101000100010101000110001",Y:"10001100010101000100001000010000100",Z:"11111000010001000100010001000011111","0":"01110100011001110101110011000101110","1":"00100011000010000100001000010001110","2":"01110100010000100010001000100011111","3":"11110000010000101110000010000111110","4":"10001100011000111111000010000100001","5":"11111100001000011110000010000111110","6":"01110100001000011110100011000101110","7":"11111000010001000100010000100001000","8":"01110100011000101110100011000101110","9":"01110100011000101111000010000101110","!":"00100001000010000100001000000000100",".":"00000000000000000000000000000000100",",":"00000000000000000000000000010001000","?":"01110100010000100010001000000000100","'":"00100001000000000000000000000000000","-":"00000000000000011111000000000000000","/":"00001000100001000100010000100010000","[":"01110010000100001000010000100001110","]":"01110000100001000010000100001001110","%":"11001110100001000100010000101110011",":":"00000001000000000000000000010000000"};
@@ -1333,22 +1346,22 @@ function spawnReefFish(c,x0){
   if(hash(c*97+4)<0.48*tw){const face=hash(c*101)<0.5?-1:1;solo.push({k:"dolphin",c,x:x0-120+hash(c*103)*240,y:top+12+hash(c*107)*Math.max(12,span*0.75),vx:face*16,vy:0,ph:hash(c*109)*4,tx:x0,ty:top+36,tt:0.8+hash(c*113)*2,face,hp:4,maxhp:4});}
 }
 // V61: spawn + AI for the new biome fish (NF table). Ocean/kelp/lagoon stay in their biome; anglerfish live in the ravine cavern.
-function spawnNewFish(c,x0){const tw=tropLook(x0),kw=kelpLook(x0),nearRv=Math.abs(x0-RVX)<500,ow=Math.max(0,1-tw-kw)*(x0<KELP0?1:(nearRv?0:0.35)),sf=surfY(x0,0),fl=floorY(x0);
+function spawnNewFish(c,x0){if(solo.length>340)return;const tw=tropLook(x0),kw=kelpLook(x0),nearRv=Math.abs(x0-RVX)<500,ow=Math.max(0,1-tw-kw)*(x0<KELP0?1:(nearRv?0:0.35)),sf=surfY(x0,0),fl=floorY(x0);
   const add=(k,i,y0,y1,p)=>{if(hash(c*131+i*17+3)>=p)return;const f=NF[k],face=hash(c*137+i*7)<0.5?-1:1;y1=Math.max(y0+10,y1);const y=Math.min(fl-10,y0+hash(c*139+i*11)*(y1-y0));solo.push({k,c,x:x0-150+hash(c*149+i*13)*300,y,vx:face*f.sp*0.5,vy:0,ph:hash(c*151+i)*4,tx:x0,ty:y,tt:0.5,face,hp:f.hp,maxhp:f.hp,y0,y1,home:x0});};
-  if(ow>0.05){if(hash(c*241+1)<0.28*ow){const n=6+Math.floor(hash(c*243)*4),g={x:x0,y:sf+80+hash(c*245)*150,vx:(hash(c*247)<0.5?-1:1)*14,home:x0,scat:0,t:-1,m:[]};for(let i=0;i<n;i++){const e={k:'mackerel',c,x:g.x+(hash(c*249+i)-0.5)*20,y:g.y+(hash(c*251+i)-0.5)*14,vx:g.vx,vy:0,ph:hash(c*253+i)*4,tt:1,face:1,hp:1,maxhp:1,home:x0,ball:g,ang:i/n*6.283,rad:6+hash(c*255+i)*10};g.m.push(e);solo.push(e);}}
-    if(hash(c*191+2)<0.2*ow){const n=4+Math.floor(hash(c*193)*3),dir=hash(c*197)<0.5?-1:1;let prev=null;for(let i=0;i<n;i++){const e={k:'flyingfish',c,x:x0-dir*i*14,y:sf+24,vx:dir*40,vy:0,ph:hash(c*199+i)*4,tx:x0,ty:sf+24,tt:1,face:dir,dir,hp:1,maxhp:1,home:x0,lead:prev,hist:[]};solo.push(e);prev=e;}}
-    if(hash(c*211+3)<0.14*ow){const n=3+Math.floor(hash(c*213)*2),g={tx:x0,ty:sf+90,tt:0,home:x0,m:[],t:-1};for(let i=0;i<n;i++){const e={k:'mahimahi',c,x:x0+(i-n/2)*34,y:sf+70+hash(c*217+i)*60,vx:0,vy:0,ph:hash(c*219+i)*4,tx:x0,ty:sf+90,tt:1,face:1,hp:2,maxhp:2,home:x0,grp:g,ox:(i-n/2)*36+(hash(c*221+i)-0.5)*12,oy:(hash(c*223+i)-0.5)*50};g.m.push(e);solo.push(e);}}}
+  if(ow>0.05){if(hash(c*241+1)<0.45*ow){const n=10+Math.floor(hash(c*243)*7),g={x:x0,y:sf+80+hash(c*245)*150,vx:(hash(c*247)<0.5?-1:1)*14,home:x0,scat:0,t:-1,m:[]};for(let i=0;i<n;i++){const e={k:'mackerel',c,x:g.x+(hash(c*249+i)-0.5)*20,y:g.y+(hash(c*251+i)-0.5)*14,vx:g.vx,vy:0,ph:hash(c*253+i)*4,tt:1,face:1,hp:1,maxhp:1,home:x0,ball:g,ang:i/n*6.283,rad:6+hash(c*255+i)*10};g.m.push(e);solo.push(e);}}
+    if(hash(c*191+2)<0.3*ow){const n=5+Math.floor(hash(c*193)*4),dir=hash(c*197)<0.5?-1:1;let prev=null;for(let i=0;i<n;i++){const e={k:'flyingfish',c,x:x0-dir*i*14,y:sf+24,vx:dir*40,vy:0,ph:hash(c*199+i)*4,tx:x0,ty:sf+24,tt:1,face:dir,dir,hp:1,maxhp:1,home:x0,lead:prev,hist:[]};solo.push(e);prev=e;}}
+    if(hash(c*211+3)<0.2*ow){const n=4+Math.floor(hash(c*213)*3),g={tx:x0,ty:sf+90,tt:0,home:x0,m:[],t:-1};for(let i=0;i<n;i++){const e={k:'mahimahi',c,x:x0+(i-n/2)*34,y:sf+70+hash(c*217+i)*60,vx:0,vy:0,ph:hash(c*219+i)*4,tx:x0,ty:sf+90,tt:1,face:1,hp:2,maxhp:2,home:x0,grp:g,ox:(i-n/2)*36+(hash(c*221+i)-0.5)*12,oy:(hash(c*223+i)-0.5)*50};g.m.push(e);solo.push(e);}}}
   if(x0<WALLX+500&&hash(c*227+4)<0.7){const y=sf+60+hash(c*229)*500;solo.push({k:'sunfish',c,x:WALLX+30,y:Math.min(fl-30,y),vx:0,vy:0,ph:hash(c*231)*4,tx:WALLX+30,ty:y,tt:0,face:-1,hp:4,maxhp:4,wall:'L',home:x0});}
   if(Math.abs(x0-RVX)<=200&&hash(c*233+5)<0.6){const sd=hash(c*237)<0.5?-1:1,y=floorY(RVX)+40;solo.push({k:'sunfish',c,x:RVX+sd*20,y,vx:0,vy:0,ph:hash(c*239)*4,tx:RVX,ty:y,tt:0,face:-sd,hp:4,maxhp:4,wall:'R',side:sd,home:x0});}
-  if(kw>0.2){add('garibaldi',5,fl-170,fl-16,0.31*kw);add('kelpbass',6,sf+60,fl-40,0.25*kw);add('sheephead',7,fl-60,fl-12,0.19*kw);add('rockfish',8,fl-12,fl-6,0.22*kw);}
-  if(tw>0.3){const top=reefTop(x0);add('parrotfish',9,fl-30,fl-8,0.28*tw);
-    if(hash(c*261+1)<0.31*tw){const y=top+hash(c*263)*(fl-top-10),a={k:'butterflyfish',c,x:x0,y,vx:8,vy:0,ph:0,tx:x0,ty:y,tt:0,face:1,hp:1,maxhp:1,y0:top,y1:fl-8,home:x0},b={k:'butterflyfish',c,x:x0-8,y:y+3,vx:8,vy:0,ph:1.3,tt:0,face:1,hp:1,maxhp:1,home:x0,mate:a};a.mate=b;solo.push(a,b);}
-    if(hash(c*271+1)<0.28*tw){const n=3+Math.floor(hash(c*273)*3),g={tx:x0,ty:top+20,tt:0,home:x0,m:[],t:-1,tang:1};for(let i=0;i<n;i++){const e={k:'bluetang',c,x:x0+(i-n/2)*12,y:top+20+hash(c*277+i)*20,vx:0,vy:0,ph:hash(c*279+i)*4,tt:1,face:1,hp:1,maxhp:1,home:x0,grp:g,ox:(i-n/2)*13,oy:(hash(c*281+i)-0.5)*16};g.m.push(e);solo.push(e);}}
+  if(kw>0.2){add('garibaldi',5,fl-170,fl-16,0.4*kw);add('kelpbass',6,sf+60,fl-40,0.36*kw);add('kelpbass',16,sf+60,fl-40,0.2*kw);add('sheephead',7,fl-60,fl-12,0.26*kw);add('rockfish',8,fl-12,fl-6,0.3*kw);}
+  if(tw>0.3){const top=reefTop(x0);add('parrotfish',9,fl-30,fl-8,0.38*tw);add('parrotfish',19,fl-30,fl-8,0.2*tw);
+    if(hash(c*261+1)<0.42*tw){const y=top+hash(c*263)*(fl-top-10),a={k:'butterflyfish',c,x:x0,y,vx:8,vy:0,ph:0,tx:x0,ty:y,tt:0,face:1,hp:1,maxhp:1,y0:top,y1:fl-8,home:x0},b={k:'butterflyfish',c,x:x0-8,y:y+3,vx:8,vy:0,ph:1.3,tt:0,face:1,hp:1,maxhp:1,home:x0,mate:a};a.mate=b;solo.push(a,b);}
+    if(hash(c*271+1)<0.42*tw){const n=5+Math.floor(hash(c*273)*4),g={tx:x0,ty:top+20,tt:0,home:x0,m:[],t:-1,tang:1};for(let i=0;i<n;i++){const e={k:'bluetang',c,x:x0+(i-n/2)*12,y:top+20+hash(c*277+i)*20,vx:0,vy:0,ph:hash(c*279+i)*4,tt:1,face:1,hp:1,maxhp:1,home:x0,grp:g,ox:(i-n/2)*13,oy:(hash(c*281+i)-0.5)*16};g.m.push(e);solo.push(e);}}
     add('lionfish',12,top+10,fl-6,0.16*tw);}
-  {const mb=midBand(x0),A=(k,i,p,n,ox)=>{if(hash(c*301+i*19+7)>=p)return;const f=NF[k];let L=null;for(let j=0;j<n;j++){const y=mb[0]+hash(c*307+i*23+j)*(mb[1]-mb[0]),face=hash(c*311+i)<0.5?-1:1,e={k,c,x:x0-120+hash(c*313+i*29+j)*240,y,vx:face*f.sp*0.4,vy:0,ph:hash(c*317+i+j)*4,tx:x0,ty:y,tt:0.5,face,hp:f.hp,maxhp:f.hp,home:x0,lead:L,ox:-(ox||12)*(j%2?1:-0.4)-j*3,oy:(j%2?1:-1)*(4+j*2)};solo.push(e);if(!L)L=e;}};
-    if(ow>0.05){A('barracuda',1,0.12*ow,1);A('trevally',2,0.12*ow,1);A('wahoo',3,0.08*ow,1);A('opah',4,0.04*ow,1);}
-    if(kw>0.2){A('senorita',5,0.18*kw,1);A('opaleye',6,0.12*kw,3,14);A('halfmoon',7,0.12*kw,1);A('blacksmith',8,0.12*kw,4+Math.floor(hash(c*331)*2),10);}
-    if(tw>0.3){A('moorishidol',9,0.14*tw,2,8);A('yellowtang',10,0.14*tw,3+Math.floor(hash(c*337)*2),10);A('angelfish',11,0.12*tw,1);A('triggerfish',12,0.1*tw,1);}}
+  {const mb=midBand(x0),A=(k,i,p,n,ox,pat)=>{if(hash(c*301+i*19+7)>=p)return;const f=NF[k];let L=null;for(let j=0;j<n;j++){const y=mb[0]+hash(c*307+i*23+j)*(mb[1]-mb[0]),face=hash(c*311+i)<0.5?-1:1,e={k,c,x:x0-120+hash(c*313+i*29+j)*240,y,vx:face*f.sp*0.4,vy:0,ph:hash(c*317+i+j)*4,tx:x0,ty:y,tt:0.5,face,hp:f.hp,maxhp:f.hp,home:x0,lead:L,ox:-(ox||12)*(j%2?1:-0.4)-j*3,oy:(j%2?1:-1)*(4+j*2),pat:pat||null,j:j-1,n:n-1};solo.push(e);if(!L)L=e;}};
+    if(ow>0.05){A('barracuda',1,0.16*ow,3+Math.floor(hash(c*341)*2),16,'line');A('trevally',2,0.22*ow,6+Math.floor(hash(c*343)*4),12,'boid');A('wahoo',3,0.08*ow,1);A('opah',4,0.04*ow,1);}
+    if(kw>0.2){A('senorita',5,0.3*kw,6+Math.floor(hash(c*345)*3),8,'ribbon');A('opaleye',6,0.22*kw,5+Math.floor(hash(c*347)*3),14,'vee');A('halfmoon',7,0.2*kw,3+Math.floor(hash(c*349)*2),12,'line');A('blacksmith',8,0.25*kw,8+Math.floor(hash(c*331)*5),10,'ball');}
+    if(tw>0.3){A('moorishidol',9,0.2*tw,3+Math.floor(hash(c*351)*3),8,'vee');A('yellowtang',10,0.26*tw,7+Math.floor(hash(c*337)*5),10,'ball');A('yellowtang',13,0.16*tw,6+Math.floor(hash(c*353)*3),10,'boid');A('angelfish',11,0.12*tw,1);A('triggerfish',12,0.1*tw,1);}}
   if(Math.abs(x0-RVX)<=200){for(let i=0;i<2;i++){if(hash(c*157+i*5)>=(i?0.5:0.9))continue;for(let q=0;q<8;q++){const x=RVX+(hash(c*163+i*31+q)-0.5)*CAVRX*1.3,y=CAVY+(hash(c*167+i*37+q)-0.5)*CAVRY*1.1;if(inCave(x,y)){const f=NF.anglerfish,face=hash(c*173+i)<0.5?-1:1;solo.push({k:'anglerfish',c,x,y,vx:face*3,vy:0,ph:hash(c*179+i)*4,tx:x,ty:y,tt:1,face,hp:f.hp,maxhp:f.hp,home:RVX});break;}}}}}
 const FLY_LAG=0.13;
 function flyPos(L,t){const h=L.hist;for(let i=h.length-1;i>=0;i--)if(h[i].t<=t)return h[i];return h.length?h[0]:null;}
@@ -1381,8 +1394,8 @@ function nfPuff(x,y,n){for(let i=0;i<n;i++)spawn(x+(Math.random()-0.5)*4,y,(Math
 function nfMove(e,dt,mx,Tm){const sf=surfY(e.x,Tm),fl=floorY(e.x);if(e.y<sf+8)e.vy+=50*dt;if(e.y>fl-4)e.vy-=60*dt;if(e.x<WALLX+50)e.vx+=40*dt;const v=Math.hypot(e.vx,e.vy);if(v>mx){e.vx*=mx/v;e.vy*=mx/v;}e.x+=e.vx*dt;e.y+=e.vy*dt;if(Math.abs(e.vx)>0.3)e.face=e.vx>0?1:-1;}
 function stepMack(e,dt,Tm){const g=e.ball,f=NF.mackerel;g.m=g.m.filter(m=>solo.includes(m));
   if(g.t!==Tm){g.t=Tm;const ow=1-tropLook(g.x)-kelpLook(g.x);if(ow<0.4||g.x<WALLX+150||Math.abs(g.x-g.home)>500)g.vx=(g.x<g.home?1:-1)*14;g.x+=g.vx*dt;g.y=Math.max(surfY(g.x,0)+40,g.y+Math.sin(Tm*0.4+g.home)*6*dt);
-    if(nfDiver()&&Math.hypot(DV.x-g.x,DV.y-g.y)<60)g.scat=Tm+2.5;}
-  if(Tm<g.scat){const dx=e.x-DV.x,dy=e.y-DV.y,d=Math.hypot(dx,dy)||1;e.vx+=dx/d*160*dt;e.vy+=dy/d*120*dt;nfMove(e,dt,f.sp*1.6,Tm);return;}
+    {const P=plNear(g.x,g.y,60);if(P){g.scat=Tm+2.5;g.px=P.x;g.py=P.y;}}}
+  if(Tm<g.scat){const dx=e.x-(g.px??DV.x),dy=e.y-(g.py??DV.y),d=Math.hypot(dx,dy)||1;e.vx+=dx/d*160*dt;e.vy+=dy/d*120*dt;nfMove(e,dt,f.sp*1.6,Tm);return;}
   e.ang+=dt*(1.6+e.rad*0.05);steer(e,g.x+Math.cos(e.ang)*e.rad,g.y+Math.sin(e.ang)*e.rad*0.55,f.sp,dt,3);nfMove(e,dt,f.sp*1.2,Tm);}
 function stepGari(e,dt,Tm){const f=NF.garibaldi;e.hx=e.hx==null?e.x:e.hx;e.hy=e.hy==null?e.y:e.hy;e.cd=e.cd||0;
   if(e.dart>Tm){steer(e,DV.x,DV.y,52,dt,6);if(nfDiver()&&Math.hypot(DV.x-e.x,DV.y-e.y)<8){DV.vx+=(e.face||1)*25;e.dart=0;cageMsg('GARIBALDI: GET OUT OF MY KELP!',Tm,1.2);}nfMove(e,dt,55,Tm);return;}
@@ -1427,9 +1440,22 @@ function stepAngler(e,dt,Tm){const f=NF.anglerfish,lx=e.x+(e.face||1)*9,ly=e.y-3
   return 1;}
 // V67 mid-water fish: stay in the middle 35-65% of the water column of their biome
 function midBand(x){const sf=surfY(x,0),fl=floorY(x);return [sf+(fl-sf)*0.35,sf+(fl-sf)*0.65];}
+// V69 school patterns for mid-water followers: boid / ball (rotating swirl) / ribbon (sine wave) / line / vee; split + rejoin near player
+function plNear(x,y,r){if(DV.on&&Math.hypot(DV.x-x,DV.y-y)<r)return DV;if(!DV.on&&boatKind===3&&Math.hypot(B.x-x,B.y-y)<r+30)return B;return null;}
+function patSlot(e,L,Tm){const fc=L.face||1,j=e.j||0,n=Math.max(1,e.n||1),ph=e.ph||0;let ox,oy;
+  switch(e.pat){
+    case 'boid':{const a=j*2.39996+Tm*0.25,r=5+Math.sqrt(j+1)*5;ox=-6*fc+Math.cos(a)*r*1.3+Math.sin(Tm*1.7+ph)*2;oy=Math.sin(a)*r*0.7+Math.cos(Tm*1.3+ph)*2;break;}
+    case 'ball':{const ring=j%3,dir=ring===1?-1:1,a=j/n*6.2832*3+Tm*(1.1+ring*0.25)*dir,r=7+ring*6;ox=Math.cos(a)*r;oy=Math.sin(a)*r*0.75;break;}
+    case 'ribbon':ox=-(j+1)*7*fc;oy=Math.sin(Tm*2.6-j*0.7+ph*0.1)*(3+j*0.9);break;
+    case 'line':ox=-(j+1)*11*fc;oy=Math.sin(Tm*1.2-j*0.5)*1.5;break;
+    case 'vee':{const row=(j>>1)+1,sd=j&1?1:-1;ox=-row*9*fc;oy=sd*row*6;break;}
+    default:ox=e.ox*fc;oy=e.oy;}
+  let split=0;const P=plNear(L.x,L.y,75);
+  if(P){const sd=(j&1)?1:-1,dx=L.x-P.x,dy=L.y-P.y,d=Math.hypot(dx,dy)||1;ox+=(-dy/d)*sd*34+dx/d*10;oy+=(dx/d)*sd*34+dy/d*10;split=1;}
+  return [L.x+ox,L.y+oy,split];}
 function stepMid(e,dt,Tm){const f=NF[e.k];let sp=f.sp*0.6,acc=1.2,mx=f.sp*1.3;const L=e.lead&&solo.includes(e.lead)&&!e.lead.onHook?e.lead:null;if(e.lead&&!L)e.lead=null;
   const dv=nfDiver()?Math.hypot(DV.x-e.x,DV.y-e.y):1e9;
-  if(L){if(e.k==='opaleye'&&dv<60){const n=dv||1;e.vx+=(e.x-DV.x)/n*120*dt;e.vy+=(e.y-DV.y)/n*80*dt;mx=f.sp*1.8;}else steer(e,L.x+e.ox*(L.face||1),L.y+e.oy,f.sp*0.9,dt,2.5);}
+  if(L){if(e.k==='opaleye'&&dv<60){const n=dv||1;e.vx+=(e.x-DV.x)/n*120*dt;e.vy+=(e.y-DV.y)/n*80*dt;mx=f.sp*1.8;}else{const q=patSlot(e,L,Tm);steer(e,q[0],q[1],f.sp*(q[2]?1.6:0.95),dt,q[2]?4:2.8);if(q[2])mx=f.sp*1.8;}}
   else{e.tt-=dt;const bw=f.b==='lagoon'?tropLook(e.x):f.b==='kelp'?kelpLook(e.x):1-tropLook(e.x)-kelpLook(e.x);
     if(e.tt<=0||Math.hypot(e.tx-e.x,e.ty-e.y)<8){const mb=midBand(e.x);e.tx=e.x+(Math.random()-0.5)*(e.k==='wahoo'?1200:260);e.tx+=(e.home-e.tx)*0.3;if(bw<0.3)e.tx=e.home;e.ty=mb[0]+Math.random()*(mb[1]-mb[0]);e.tt=2+Math.random()*3;if(e.k==='angelfish'&&Math.random()<0.5){e.vx=-e.vx;}}
     if(e.k==='barracuda'){if(e.dash>Tm){mx=95;}else if(Tm>(e.nd||0)){e.nd=Tm+3+Math.random()*3;e.dash=Tm+0.6;const tx=dv<110?DV.x:e.x+(Math.random()<0.5?-1:1)*80,ty=dv<110?DV.y:e.y;const dx=tx-e.x,dy=ty-e.y,n=Math.hypot(dx,dy)||1;e.vx=dx/n*95;e.vy=dy/n*95;}else{sp=f.sp*0.12;}}
@@ -1476,8 +1502,29 @@ function stepReefFish(e,dt,Tm){
 }
 
 let last=performance.now(),T=DAY_CYCLE*0.45;loadDeck();
+function menuFrame(now){const dt=Math.min(0.05,Math.max(0,(now-(MENU_LAST||now))/1000));MENU_LAST=now;MENU_T+=dt;const MT=MENU_T,TT=T;
+  cx=B.x-W/2+Math.sin(MT*0.05)*160;cy=-H*0.42+Math.sin(MT*0.13)*6;const ox=Math.floor(cx),oy=Math.floor(cy);DAYK=dayK(TT);
+  for(let sx=0;sx<W;sx++){const wx=ox+sx,surf=surfY(wx,MT);for(let sy=0;sy<H;sy++)buf[sy*W+sx]=seaPixel(wx,oy+sy,surf,TT);}
+  try{paintSkyBodies(TT);}catch(e){}
+  for(let i=0;i<40;i++){const h=hash2(i,7),px=Math.round((h*W*1.3+MT*(3+h*4))%W),py=Math.round(H*0.55+((hash2(i,3)*H*0.5+MT*4)%(H*0.45)));if(py<H)put(px,py,6);}
+  if(typeof WHS!=='undefined'&&WHS.swim){const fr=WHS.swim[((Math.floor(MT/0.11)%16)+16)%16],wx=((MT*14)%(W+420))-210;blitReef(fr,W-wx,H*0.8,false,0,TT,0.75,false,false);}
+  const WHT=0xffffffff,DK=0xff3a1c0a,SH=0xff6a3a14;
+  const pp=(x,y,c)=>{if(x>=0&&x<W&&y>=0&&y<H)buf[y*W+x]=c;};
+  const big=(str,x0,y0,sc,c,o)=>{let x=x0;for(const ch of str){const g=FD[ch]||FD[" "];for(let i=0;i<35;i++)if(g[i]=="1"){const gx=x+(i%5)*sc,gy=y0+(i/5|0)*sc;for(let a=-o;a<sc+o;a++)for(let b=-o;b<sc+o;b++)if(o)pp(gx+a,gy+b,c);else pp(gx+a,gy+b,c);}x+=6*sc;}};
+  const title="DEEP SEA",sc=4,tw=title.length*6*sc-sc,tx=Math.round(W/2-tw/2),ty=Math.round(H*0.16+Math.sin(MT*1.6)*2);
+  big(title,tx,ty+3,sc,SH,1);big(title,tx,ty,sc,DK,1);big(title,tx,ty,sc,WHT,0);
+  const st="AN OCEAN FISHING ADVENTURE",sw=st.length*4-1;for(let y=ty+31;y<ty+40;y++)for(let x=Math.round(W/2-sw/2)-3;x<Math.round(W/2+sw/2)+3;x++)pp(x,y,DK);text(st,Math.round(W/2-sw/2),ty+33,10);
+  const bw=70,bh=20,bx=Math.round(W/2-bw/2),by0=Math.round(H*0.62),pr=MENU_PRESS?1:0,bob=pr?1:Math.round(Math.sin(MT*3.2)*1),by=by0+bob;
+  const pulse=0.5+0.5*Math.sin(MT*4),fill=MENU_HOV?0xff4a9a2a:0xff2f7a1c,hi=MENU_HOV?0xff7ad05a:0xff5aa83c;
+  if(!pr)for(let y=0;y<bh;y++)for(let x=0;x<bw;x++)pp(bx+x+2,by0+y+3,0xff1a0c04);
+  for(let y=-1;y<=bh;y++)for(let x=-1;x<=bw;x++){const edge=x<0||y<0||x>=bw||y>=bh;pp(bx+x,by+y,edge?DK:(y<3?hi:fill));}
+  const gl=Math.round(pulse*2);for(let x=-2-gl;x<=bw+1+gl;x++){pp(bx+x,by-2-gl,WHT);pp(bx+x,by+bh+1+gl,WHT);}for(let y=-2-gl;y<=bh+1+gl;y++){pp(bx-2-gl,by+y,WHT);pp(bx+bw+1+gl,by+y,WHT);}
+  big("START",Math.round(W/2-(5*12-2)/2),by+3,2,WHT,0);
+  const hint="CLICK, TAP OR PRESS ENTER";const hw2=hint.length*4-1;if(Math.floor(MT*1.5)%2===0||MENU_HOV)text(hint,Math.round(W/2-hw2/2),by0+bh+9,10);
+  textA(VER,W-2-VER.length*4,H-7,10,0.7);
+  ctx.putImageData(img,0,0);}
 let frameErr=0;function frame(now){try{frame0(now);}catch(e){if(!frameErr){frameErr=1;console.warn('frame error (logged once):',e);}last=now;}requestAnimationFrame(frame);}
-function frame0(now){const dt=Math.min(0.05,(now-last)/1000);last=now;T+=dt;
+function frame0(now){if(MENU){menuFrame(now);last=now;return;}const dt=Math.min(0.05,(now-last)/1000);last=now;T+=dt;
   physics(dt,T);if(HOLD){B.x=HOLD.x;B.y=HOLD.y;B.vx=B.vy=0;cx=B.x-W/2;cy=B.y-H/2;}updDrop(dt,T);updTurn(dt);updNet(dt,T);updFish(dt,T);updSchools(dt,T);updWhale(dt,T);updSea(dt,T);updGulls(dt,T);updCrabs(dt,T);updUrchins(dt,T);updChum(dt,T);updCages(dt,T);updJelly(dt,T);updFreeKing(dt,T);updBoss(dt,T);updDiver(dt,T);updSubHarp(dt,T);updFeed(dt,T);
   const ox=Math.floor(cx),oy=Math.floor(cy);
   // water + sky + surface. Day, night, and the lagoon tint live in seaPixel.
