@@ -14,7 +14,7 @@
 canvas{position:absolute;left:50%;top:50%;transform:translate(-50%,-50%);image-rendering:pixelated;image-rendering:crisp-edges;display:block}
 #mpname{position:fixed;left:50%;top:50%;transform:translate(-50%,-50%);width:min(46vw,300px);font:bold 18px monospace;letter-spacing:2px;text-align:center;text-transform:uppercase;color:#ffffff;background:#0a1830;border:3px solid #ffffff;padding:6px 8px;outline:none;z-index:3}#mpname::placeholder{color:#9fb4c8}#mpname:focus{border-color:#ffe066}
 #fs{position:fixed;right:8px;top:8px;font:bold 12px monospace;letter-spacing:1px;color:#f8fbff;background:#0a1830;border:2px solid #a8e0dc;padding:3px 6px;cursor:pointer;image-rendering:pixelated;z-index:2}</style></head>
-<body><canvas id="c" width="320" height="180"></canvas><button id="fs">FULLSCREEN</button><input id="mpname" maxlength="16" placeholder="YOUR NAME" autocomplete="off" spellcheck="false"><script src="lib/trystero.js"></script>
+<body><canvas id="c" width="320" height="180"></canvas><button id="fs">FULLSCREEN</button><input id="mpname" maxlength="16" placeholder="YOUR NAME" autocomplete="off" spellcheck="false"><script src="lib/mqttws.js"></script><script src="lib/nostrsign.js"></script>
 <script>
 // ---- V69 main menu gate: while MENU is on, capture-phase listeners swallow all game input
 let MENU=1,MENU_HOV=0,MENU_PRESS=0,MENU_T=0,MENU_LAST=0;
@@ -767,7 +767,7 @@ const F={B:"110101110101110",G:"111100101101111",J:"001001001101111",K:"10110111
 function text(s,x,y,c){for(const ch of s){const g=F[ch]||F[" "];for(let i=0;i<15;i++)if(g[i]=="1")put(x+i%3,y+(i/3|0),c);x+=4;}}
 function text2x(s,x,y,c){for(const ch of s){const g=F[ch]||F[" "];for(let i=0;i<15;i++)if(g[i]=="1"){const px=x+(i%3)*2,py=y+(i/3|0)*2;put(px,py,c);put(px+1,py,c);put(px,py+1,c);put(px+1,py+1,c);}x+=8;}}
 function fleeRot(o,dx,dy,d,T,dt){if(!((o.fleeT||0)>T)||o.fa===undefined){o.fa=(Math.random()*2-1)*0.175;o.ft=0;}o.ft=Math.max(-0.175,Math.min(0.175,(o.ft||0)+(Math.random()*2-1)*0.6*dt));const a=o.fa+o.ft,c=Math.cos(a),n=Math.sin(a),ux=dx/d,uy=dy/d;return[ux*c-uy*n,ux*n+uy*c];}
-const VER="V70";
+const VER="V71";
 function textA(s,x,y,c,a){for(const ch of s){const g=F[ch]||F[" "];for(let i=0;i<15;i++)if(g[i]=="1"){const px=x+(i%3),py=y+(i/3|0);if(px>=0&&px<W&&py>=0&&py<H){const dst=buf[py*W+px],src=P32[c],dr=dst&255,dg=(dst>>8)&255,db=(dst>>16)&255,sr=src&255,sg=(src>>8)&255,sb=(src>>16)&255;const r=(dr+(sr-dr)*a)|0,g2=(dg+(sg-dg)*a)|0,b=(db+(sb-db)*a)|0;buf[py*W+px]=0xff000000|(b<<16)|(g2<<8)|r;}}x+=4;}}
 function drawVer(){const s=VER;textA(s,W-2-s.length*4,H-7,10,0.5);}
 const FD={" ":"00000000000000000000000000000000000",A:"01110100011000111111100011000110001",B:"11110100011000111110100011000111110",C:"01111100001000010000100001000001111",D:"11110100011000110001100011000111110",E:"11111100001000011110100001000011111",F:"11111100001000011110100001000010000",G:"01111100001000010111100011000101110",H:"10001100011000111111100011000110001",I:"11111001000010000100001000010011111",J:"00111000100001000010000101001001100",K:"10001100101010011000101001001010001",L:"10000100001000010000100001000011111",M:"10001110111010110101100011000110001",N:"10001110011010110011100011000110001",O:"01110100011000110001100011000101110",P:"11110100011000111110100001000010000",Q:"01110100011000110001101011001001101",R:"11110100011000111110101001001010001",S:"01111100001000001110000010000111110",T:"11111001000010000100001000010000100",U:"10001100011000110001100011000101110",V:"10001100011000110001100010101000100",W:"10001100011000110101101011010101010",X:"10001100010101000100010101000110001",Y:"10001100010101000100001000010000100",Z:"11111000010001000100010001000011111","0":"01110100011001110101110011000101110","1":"00100011000010000100001000010001110","2":"01110100010000100010001000100011111","3":"11110000010000101110000010000111110","4":"10001100011000111111000010000100001","5":"11111100001000011110000010000111110","6":"01110100001000011110100011000101110","7":"11111000010001000100010000100001000","8":"01110100011000101110100011000101110","9":"01110100011000101111000010000101110","!":"00100001000010000100001000000000100",".":"00000000000000000000000000000000100",",":"00000000000000000000000000010001000","?":"01110100010000100010001000000000100","'":"00100001000000000000000000000000000","-":"00000000000000011111000000000000000","/":"00001000100001000100010000100010000","[":"01110010000100001000010000100001110","]":"01110000100001000010000100001001110","%":"11001110100001000100010000101110011",":":"00000001000000000000000000010000000"};
@@ -1508,13 +1508,28 @@ let last=performance.now(),T=DAY_CYCLE*0.45;loadDeck();
 const MP={on:false,id:Math.random().toString(36).slice(2,10),name:'',rooms:[],acts:[],P:new Map(),peer:new Map(),sendT:0,ride:null,seat:0,msg:''};
 function mpCleanName(v){return String(v||'').toUpperCase().replace(/[^A-Z0-9 _\-!?.]/g,'').slice(0,16).trim();}
 (function(){try{const el=document.getElementById('mpname');if(!el)return;const sv=localStorage.getItem('deepsea_name')||'';el.value=sv;el.addEventListener('input',()=>{const c=mpCleanName(el.value);if(c!==el.value.toUpperCase())el.value=c;try{localStorage.setItem('deepsea_name',mpCleanName(el.value));}catch(_){}});}catch(e){}})();
+// V71 transport: relays over WSS (no WebRTC). MQTT brokers (shiftr on port 443 first) at 12Hz + Nostr relays at ~1.5Hz as fallback.
+const MPT={topic:'deepsea-rr14/main/s',tag:'deepsea-rr14-main',brokers:[['wss://public.cloud.shiftr.io',{user:'public',pass:'public'}],['wss://broker.emqx.io:8084/mqtt'],['wss://broker.hivemq.com:8884/mqtt'],['wss://test.mosquitto.org:8081/mqtt']],relays:['wss://nos.lol','wss://nostr.mom','wss://relay.primal.net'],mq:[],ns:[],t0:0,nsT:0,seq:0,up:false};
+function mpMq(i){const [u,o]=MPT.brokers[i];if(!window.MQWS)return;const c=new MQWS(u,o);c.onmsg=(t,m)=>{try{mpRecv(JSON.parse(m),null);}catch(e){}};c.subscribe(MPT.topic);MPT.mq[i]=c;}
+function mpNs(i){const u=MPT.relays[i];let ws;try{ws=new WebSocket(u);}catch(e){MPT.ns[i]={dead:1,at:performance.now()};return;}const o={ws,ok:false,dead:0,at:performance.now()};MPT.ns[i]=o;
+  ws.onopen=()=>{o.ok=true;try{ws.send(JSON.stringify(['REQ','ds',{kinds:[25050],'#t':[MPT.tag],since:Math.floor(Date.now()/1000)}]));}catch(e){}};
+  ws.onmessage=m=>{try{const d=JSON.parse(m.data);if(d[0]==='EVENT'&&d[2]&&d[2].content&&d[2].created_at>Date.now()/1000-4)mpRecv(JSON.parse(d[2].content),null);}catch(e){}};
+  ws.onclose=()=>{o.ok=false;o.dead=1;o.at=performance.now();};ws.onerror=()=>{};}
 function mpStart(){const el=document.getElementById('mpname');let n=mpCleanName(el&&el.value);if(!n)n='DIVER'+Math.floor(100+Math.random()*900);MP.name=n;try{localStorage.setItem('deepsea_name',n);}catch(_){}if(el)el.style.display='none';
-  if(!window.Trystero){MP.msg='OFFLINE';return;}const cfg={appId:'deepsea-rainbowroar14'};
-  const join=(fn)=>{try{const r=fn(cfg,'deepsea-main');const a=r.makeAction('st');a.onMessage=(d,c)=>mpRecv(d,c&&c.peerId);r.onPeerLeave=pid=>{const id=MP.peer.get(pid);if(id){const q=MP.P.get(id);if(q&&q.pids){q.pids.delete(pid);if(!q.pids.size)MP.P.delete(id);}}};MP.rooms.push(r);MP.acts.push(a);}catch(e){console.warn('mp join',e);}};
-  join(Trystero.joinNostr);join(Trystero.joinTorrent);MP.on=MP.rooms.length>0;}
-function mpRecv(d,pid){if(!d||typeof d!=='object'||typeof d.i!=='string'||d.i===MP.id)return;let q=MP.P.get(d.i);const now=performance.now();
+  MP.on=true;MPT.t0=performance.now();
+  try{for(let i=0;i<MPT.brokers.length;i++)mpMq(i);}catch(e){console.warn('mq',e);}
+  try{for(let i=0;i<MPT.relays.length;i++)mpNs(i);}catch(e){console.warn('ns',e);}
+  addEventListener('pagehide',()=>{mpSend({i:MP.id,bye:1},true);});
+  setInterval(mpHeal,5000);}
+function mpHeal(){const now=performance.now();for(let i=0;i<MPT.brokers.length;i++){const c=MPT.mq[i];if(!c||c.dead){if(!c||!c.retryAt){if(c)c.retryAt=now+(i===0?3000:20000);else mpMq(i);}else if(now>c.retryAt)mpMq(i);}}
+  for(let i=0;i<MPT.relays.length;i++){const o=MPT.ns[i];if(!o||(o.dead&&now-o.at>15000))mpNs(i);}}
+function mpUpCount(){let n=0;for(const c of MPT.mq)if(c&&c.ok)n++;for(const o of MPT.ns)if(o&&o.ok)n++;return n;}
+function mpSend(pk,force){const js=JSON.stringify(pk);let sent=false;for(const c of MPT.mq)if(c&&c.ok&&c.publish(MPT.topic,js))sent=true;
+  const now=performance.now();if((force||now-MPT.nsT>650||!sent)&&window.NostrSign&&now-MPT.nsT>(force?0:450)){MPT.nsT=now;let ev=null;for(const o of MPT.ns)if(o&&o.ok){try{if(!ev)ev=NostrSign.sign({kind:25050,created_at:Math.floor(Date.now()/1000),tags:[['t',MPT.tag]],content:js});o.ws.send(JSON.stringify(['EVENT',ev]));}catch(e){}}}}
+function mpStatus(){if(!MP.on)return '';const up=mpUpCount();if(!up)return performance.now()-MPT.t0<12000?'CONNECTING...':'OFFLINE - MULTIPLAYER BLOCKED';return 'ONLINE '+(MP.P.size+1)+(MP.P.size?'':'  (NO ONE ELSE YET)');}
+function mpRecv(d,pid){if(!d||typeof d!=='object'||typeof d.i!=='string'||d.i===MP.id)return;let q=MP.P.get(d.i);const now=performance.now();if(d.bye){MP.P.delete(d.i);return;}if(typeof d.x!=='number'||typeof d.bx!=='number')return;if(q&&typeof d.q==='number'&&q.lq!==undefined&&d.q<=q.lq&&d.q>q.lq-1000)return;
   if(!q){q={pids:new Set(),x:d.x,y:d.y,bx:d.bx,by:d.by};MP.P.set(d.i,q);}if(pid){q.pids.add(pid);MP.peer.set(pid,d.i);}
-  q.last=now;q.d=d;q.n=mpCleanName(d.n)||'?';}
+  q.last=now;q.lq=d.q;q.d=d;q.n=mpCleanName(d.n)||'?';}
 function mpCell(){let k='a',fx=0,fy=0;try{if(DV.q.length){k='t';fx=DV.q[0].x;fy=DV.q[0].y;}else{const A=DMETA.anims[DV.cur];[fx,fy]=A.f[DV.fi%A.f.length];}if(DV.sub)k+='2';}catch(e){}return [k,fx,fy];}
 function mpHost(){return MP.ride?MP.P.get(MP.ride):null;}
 function mpSeat(q){const d=q.d,f=d.bf||1;return [q.bx+(MP.seat?-8:6)*f,q.by-(d.bk===3?14:9)];}
@@ -1531,7 +1546,7 @@ function mpUpdate(dt,T){if(!MP.on)return;const now=performance.now(),k=Math.min(
   MP.sendT-=dt;if(MP.sendT<=0){MP.sendT=1/12;const r1=v=>Math.round(v*10)/10,[ck,fx,fy]=mpCell();
     const pk={i:MP.id,n:MP.name,d:DV.on?1:0,x:r1(DV.on?DV.x:B.x),y:r1(DV.on?DV.y:B.y),bx:r1(B.x),by:r1(B.y),bk:boatKind,bf:B.face||1,ba:r1(B.ang||0),k:ck,fx,fy,df:DV.face||1,r:MP.ride||0};
     if(fish.st>=2)pk.h=[r1(fish.x),r1(fish.y)];if(SUBH.st)pk.s=[r1(SUBH.x),r1(SUBH.y)];if(SPR.st)pk.p=[r1(SPR.x),r1(SPR.y)];
-    for(const a of MP.acts){try{a.send(pk);}catch(e){}}}}
+    pk.q=++MPT.seq;mpSend(pk);}}
 function mpLine(x0,y0,x1,y1,c){const n=Math.ceil(Math.hypot(x1-x0,y1-y0));for(let i=0;i<=n;i++){const t=i/Math.max(1,n);put(Math.round(x0+(x1-x0)*t-cx),Math.round(y0+(y1-y0)*t-cy),c);}}
 function mpTag(name,wx,wy,me){const s=name,x=Math.round(wx-cx-s.length*2),y=Math.round(wy-cy);if(x<-80||x>W+10||y<-10||y>H+10)return;for(let yy=y-1;yy<y+6;yy++)for(let xx=x-2;xx<x+s.length*4+1;xx++)put(xx,yy,0);text(s,x,y,me?10:10);if(me){put(x-2,y+6,10);}}
 function mpDraw(T){if(!MP.on)return;for(const [,q] of MP.P){const d=q.d;if(!d)continue;
@@ -1541,7 +1556,7 @@ function mpDraw(T){if(!MP.on)return;for(const [,q] of MP.P){const d=q.d;if(!d)co
     else mpTag(q.n,q.bx,q.by-(bk===3?30:24),false);}
   const me=MP.name;if(me){if(DV.on)mpTag(me,DV.x,DV.y-(MP.ride?30:20),true);else mpTag(me,B.x,B.y-(boatKind===3?30:24),true);}
   if(DV.on&&!MP.ride){const id=mpNearBoat();if(id){const q=MP.P.get(id),s='V BOARD';text(s,Math.round(q.bx-cx-s.length*2),Math.round(q.by-cy-36),10);}}}
-function mpHUD(){if(!MENU){const s=MP.on?('ONLINE '+(MP.P.size+1)):'OFFLINE';for(let y=H-9;y<H-1;y++)for(let x=2;x<6+s.length*4;x++)put(x,y,0);text(s,4,H-7,10);}}
+function mpHUD(){if(!MENU){const s=MP.on?mpStatus():'OFFLINE';for(let y=H-9;y<H-1;y++)for(let x=2;x<6+s.length*4;x++)put(x,y,0);text(s,4,H-7,10);}}
 function menuFrame(now){const dt=Math.min(0.05,Math.max(0,(now-(MENU_LAST||now))/1000));MENU_LAST=now;MENU_T+=dt;const MT=MENU_T,TT=T;
   cx=B.x-W/2+Math.sin(MT*0.05)*160;cy=-H*0.42+Math.sin(MT*0.13)*6;const ox=Math.floor(cx),oy=Math.floor(cy);DAYK=dayK(TT);
   for(let sx=0;sx<W;sx++){const wx=ox+sx,surf=surfY(wx,MT);for(let sy=0;sy<H;sy++)buf[sy*W+sx]=seaPixel(wx,oy+sy,surf,TT);}
